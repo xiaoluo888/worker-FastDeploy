@@ -1,5 +1,7 @@
 ![FastDeploy worker banner](https://github.com/user-attachments/assets/42b0039f-39e3-4279-afda-6d1865dfbffb)
 
+Run LLMs using [Fastdeploy](https://github.com/PaddlePaddle/FastDeploy) with an OpenAI-compatible API
+
 ---
 
 [![Runpod](https://api.runpod.io/badge/xiaoluo888/runpod)](https://www.console.runpod.io/hub/xiaoluo888/runpod)

@@ -36,6 +36,16 @@
           }
         },
         {
+          "key": "MAX_CONCURRENCY",
+          "input": {
+            "name": "Max Concurrency",
+            "type": "number",
+            "description": "Only required for service deployment, the actual number of connections established by the service, default 512",
+            "default": 512,
+            "advanced": true
+          }
+        },
+        {
           "key": "MAX_MODEL_LEN",
           "input": {
             "name": "Max model length",

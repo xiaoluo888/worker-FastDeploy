@@ -1,14 +1,24 @@
-# rp_handler.py
-import runpod  # Required
+import runpod
+from utils import JobInput
+from engine import FastDeployEngine
 
-def handler(event):
-    # Extract input data from the request
-    input_data = event["input"]
-    
-    # Process the input (replace this with your own code)
-    result = process_data(input_data)
-    
-    # Return the result
-    return result
+fd_engine = FastDeployEngine()
 
-runpod.serverless.start({"handler": handler})  # Required
+async def handler(job):
+    job_input = JobInput(job["input"])
+    engine = fd_engine
+
+    results_generator = engine.generate(job_input)
+
+    async for batch in results_generator:
+        yield batch
+
+
+runpod.serverless.start(
+    {
+        "handler": handler,
+        "concurrency_modifier": lambda _current: fd_engine.max_concurrency,
+        "return_aggregate_stream": True,
+    }
+)
+
