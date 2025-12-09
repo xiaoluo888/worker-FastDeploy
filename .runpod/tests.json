@@ -33,9 +33,11 @@
       "gpuTypeId": "NVIDIA GeForce RTX 4090",
       "gpuCount": 1,
       "env": [
-        {
-          "key": "MODEL", 
-          "value": "baidu/ERNIE-4.5-0.3B-Paddle" },
+        { "key": "MODEL", "value": "baidu/ERNIE-4.5-0.3B-Paddle" },
+        { "key": "MODEL_REPO", "value": "baidu/ERNIE-4.5-0.3B-Paddle" },
+        { "key": "MAX_MODEL_LEN", "value": "32768" },
+        { "key": "MAX_NUM_SEQS", "value": "32" },
+        { "key": "ENABLE_V1_KVCACHE_SCHEDULER", "value": "1" }
       ],
       "allowedCudaVersions": ["12.9", "12.8", "12.7", "12.6", "12.5"]
     }

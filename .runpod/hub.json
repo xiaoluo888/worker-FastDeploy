@@ -16,9 +16,10 @@
   
       "presets": [
         {
-          "name": "baidu/ERNIE-4.5-0.3B-Paddle",
+          "name": "Model",
           "defaults": {
             "MODEL": "baidu/ERNIE-4.5-0.3B-Paddle",
+            "MODEL_REPO": "baidu/ERNIE-4.5-0.3B-Paddle",
             "ENABLE_V1_KVCACHE_SCHEDULER": "1"
           }
         }
