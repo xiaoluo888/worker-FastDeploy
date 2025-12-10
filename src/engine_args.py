@@ -34,6 +34,7 @@ def _append_bool_flag(argv, flag: str, env_key: str):
 def _build_argv_from_env():
     argv = []
 
+    # model = os.getenv("MODEL","/root/PaddlePaddle/ERNIE-4.5-0.3B-Paddle")
     model = os.getenv("MODEL","baidu/ERNIE-4.5-0.3B-Paddle")
     if not model:
         raise RuntimeError("MODEL not set")

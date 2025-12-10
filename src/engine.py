@@ -1,5 +1,6 @@
 # engine.py
 import os
+import json
 import logging
 import threading
 import asyncio
@@ -9,16 +10,15 @@ from fastdeploy.engine.args_utils import EngineArgs
 from fastdeploy.engine.engine import LLMEngine
 from fastdeploy.entrypoints.openai.utils import make_arg_parser
 from fastdeploy.utils import FlexibleArgumentParser
-from utils import JobInput
+from utils import JobInput, create_error_response
 from engine_args import get_engine_args
-
-
+from runpod import RunPodLogger
+log = RunPodLogger()
 
 import time
 from fastdeploy.engine.engine import LLMEngine as _FDLLM
 
 def _llm_get_generated_tokens(self, req_id):
-    """用 _get_generated_result 模拟出 _get_generated_tokens 的行为。"""
     while True:
         results = self._get_generated_result()
         if not results:
@@ -71,9 +71,9 @@ def get_fd_engine_args() -> EngineArgs:
 
 class FastDeployEngine:
     def __init__(self):
-        logging.info("Initializing FastDeploy LLM engine (RunPod adapter)...")
+        log.info("Initializing FastDeploy LLM engine (RunPod adapter)...")
         self.engine_args = get_engine_args()
-        logging.info(f"Engine args: {self.engine_args}")
+        log.info(f"Engine args: {self.engine_args}")
         self.llm_engine = LLMEngine.from_engine_args(self.engine_args)
 
         ok = self.llm_engine.start(api_server_pid=None)
@@ -86,10 +86,12 @@ class FastDeployEngine:
     # ===== 把 JobInput 映射成 FD 需要的 prompts dict =====
     def _jobinput_to_prompts(self, job_input) -> Dict[str, Any]:
         """
-        把 JobInput 统一转换成 FastDeploy LLMEngine 所需的 prompts dict。
-        支持两种情况：
-        1）原始模式：input 里直接有 prompt / text / input
-        2）OpenAI 模式：input 里有 openai_route + openai_input
+        适配 utils.JobInput → FastDeploy LLMEngine 所需的 prompts dict。
+        当前 JobInput 结构：
+            - job_input.llm_input: 真正的 prompt（str 或 list）
+            - job_input.max_tokens: int
+            - job_input.raw: 原始 input dict
+            - job_input.openai_route / openai_input: OpenAI 兼容模式
         """
         prompts: Dict[str, Any] = {}
 
@@ -161,27 +163,43 @@ class FastDeployEngine:
 
             return prompts
 
-        # ========== 2. 非 OpenAI 模式：走“原始 prompt” ==========
-        # 这里 job_input.prompt 是 __init__ 里从 prompt/text/input 兜过来的
-        prompt = job_input.prompt
-        if prompt is None:
-            raise ValueError("JobInput 中未找到 prompt 或 openai_input 字段。")
+        # ========== 2. 非 OpenAI 模式：走“原始 llm_input / raw” ==========
+        # 你的 utils.JobInput 里没有 prompt 字段，只有 llm_input + raw
+        llm_input = getattr(job_input, "llm_input", None)
 
-        # 如果 prompt 是 dict（例如用户误传了个结构体），简单序列化一下避免类型错误
-        if isinstance(prompt, dict):
-            prompt = json.dumps(prompt, ensure_ascii=False)
+        if llm_input is None:
+            # 兜底：从 raw 里尝试取 prompt
+            raw = getattr(job_input, "raw", {}) or {}
+            llm_input = raw.get("prompt")
 
-        # 如果是 list[str]，合并成一个字符串
-        if isinstance(prompt, list):
-            if prompt and isinstance(prompt[0], str):
-                prompt = "\n".join(prompt)
-            # 如果将来支持 list[int]（已经是 token id），这里就直接交给 FD，不处理
+        if llm_input is None:
+            raise ValueError("JobInput 中未找到 llm_input 或 raw['prompt'] 字段。")
+
+        # 统一把 llm_input 转成字符串 prompt
+        if isinstance(llm_input, dict):
+            # 如果是 dict（比如单条 message），尝试取 content，否则直接序列化
+            if "content" in llm_input:
+                prompt = str(llm_input["content"])
+            else:
+                prompt = json.dumps(llm_input, ensure_ascii=False)
+        elif isinstance(llm_input, list):
+            # list[str] 或 list[dict]，简单拼接
+            if llm_input and isinstance(llm_input[0], dict) and "content" in llm_input[0]:
+                prompt = "\n".join(str(m.get("content", "")) for m in llm_input)
+            else:
+                prompt = "\n".join(str(x) for x in llm_input)
+        else:
+            # str / 其它类型
+            prompt = str(llm_input)
 
         prompts["prompt"] = prompt
 
-        # 原始模式下的 max_tokens / temperature 从 job_input.raw 里取
-        raw = job_input.raw
-        max_tokens = raw.get("max_tokens") or raw.get("max_new_tokens")
+        # 原始模式下的 max_tokens / temperature：
+        raw = getattr(job_input, "raw", {}) or {}
+        # 先用 job_input.max_tokens，再兜 raw
+        max_tokens = getattr(job_input, "max_tokens", None) \
+                    or raw.get("max_tokens") \
+                    or raw.get("max_new_tokens")
         temperature = raw.get("temperature")
 
         if max_tokens:
@@ -191,32 +209,69 @@ class FastDeployEngine:
 
         return prompts
 
-    # ===== 核心：同步 generate -> 异步 async generator =====
-    async def generate(self, job_input) -> AsyncGenerator[Dict[str, Any], None]:
-        """
-        RunPod 期望的 async generator：
-        - 内部起一个线程跑 LLMEngine.generate(prompts, stream=True)
-        - 通过 asyncio.Queue 把结果推出来
-        """
+
+    async def _generate_fd(
+        self,
+        llm_input,
+        request_id: str,
+        job_input: JobInput,
+        stream: bool = True
+    ) -> AsyncGenerator[Dict[str, Any], None]:
         prompts = self._jobinput_to_prompts(job_input)
         loop = asyncio.get_running_loop()
         queue: asyncio.Queue = asyncio.Queue()
 
         def _worker():
             try:
-                for out in self.llm_engine.generate(prompts, stream=True):
+                log.debug("==================== gougou1 ====================")
+                log.info(llm_input)
+                log.info(prompts)
+                log.debug("==================== gougou2 ====================")
+                # FastDeploy 的 generate 是同步 iterator
+                for out in self.llm_engine.generate(prompts, stream=stream):
+                    # out 通常是 dict，这里顺手塞个 request_id 进去，方便调试
+                    if isinstance(out, dict) and request_id is not None:
+                        out.setdefault("request_id", request_id)
                     loop.call_soon_threadsafe(queue.put_nowait, out)
             except Exception as e:
-                loop.call_soon_threadsafe(queue.put_nowait, {"__error__": str(e)})
+                # 出错时，用 error payload 推回 async 侧
+                err_payload = {
+                    "error": {
+                        "message": str(e),
+                        "type": "FastDeployEngineError",
+                    }
+                }
+                loop.call_soon_threadsafe(queue.put_nowait, err_payload)
             finally:
+                # 用 None 作为结束标记
                 loop.call_soon_threadsafe(queue.put_nowait, None)
 
+        # 启动后台线程
         threading.Thread(target=_worker, daemon=True).start()
 
+        # async 侧消费队列里的数据，一条条往外 yield
         while True:
             item = await queue.get()
             if item is None:
                 break
-            if "__error__" in item:
-                raise RuntimeError(f"FD engine error: {item['__error__']}")
             yield item
+
+
+    async def generate(self, job_input: JobInput):
+        log.debug("==================== Dump JobInput ====================")
+        log.debug(f"type(job_input) = {type(job_input)}")
+        try:
+            log.debug(f"job_input.__dict__ = {getattr(job_input, '__dict__', None)}")
+        except Exception as e:
+            log.debug(f"access __dict__ failed: {e}")
+        log.debug("==================== Dump JobInput END ====================")
+        try:
+            async for batch in self._generate_fd(
+                llm_input=job_input.llm_input,
+                stream=job_input.stream,
+                request_id=job_input.request_id,
+                job_input=job_input
+            ):
+                yield batch
+        except Exception as e:
+            yield create_error_response(str(e))

@@ -1,19 +1,6 @@
 {
-"input": {
-          "openai_route": "/v1/chat/completions",
-          "openai_input": {
-            "messages": [
-              {
-                "role": "system",
-                "content": "You are a helpful assistant that writes concise responses."
-              },
-              {
-                "role": "user",
-                "content": "Explain what a neural network is in one sentence."
-              }
-            ],
-            "max_tokens": 200,
-            "temperature": 0.1
-          }
-        }
+  "input": {
+    "prompt": "介绍一下百度.",
+    "max_tokens": 128
+  }
 }

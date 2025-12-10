@@ -43,18 +43,19 @@ class JobInput:
         self.raw = job
 
         # 通用文本输入：适配多种字段名
-        self.prompt = job.get("prompt") or job.get("text") or job.get("input")
-
-        # 是否流式输出（FD 任务中如果不支持流式，可以忽略）
+        self.llm_input = job.get("prompt") or job.get("text") or job.get("input")
         self.stream = job.get("stream", False)
+        self.max_tokens = job.get("max_tokens", 200)
 
         # 是否走 OpenAI 兼容路由（比如 /v1/chat/completions /v1/images/generations）
         self.openai_route = job.get("openai_route", False)
         self.openai_input = job.get("openai_input")
-
         self.request_id = str(uuid.uuid4())
+        self.openai_route = job.get("openai_route")
+        self.openai_input = job.get("openai_input")
 
-
+    def __repr__(self):
+        return f"JobInput({self.__dict__})"
 
 # ----------------------------------------------------------------------
 # Dummy request/state，用于模拟 web 框架上下文（如果后面某些逻辑需要）
