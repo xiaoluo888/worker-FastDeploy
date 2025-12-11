@@ -7,7 +7,7 @@ import asyncio
 from typing import AsyncGenerator, Dict, Any
 
 from fastdeploy.engine.args_utils import EngineArgs
-from fastdeploy.engine.engine import LLMEngine
+from fastdeploy.engine.async_llm import AsyncLLMEngine 
 from fastdeploy.entrypoints.openai.utils import make_arg_parser
 from fastdeploy.utils import FlexibleArgumentParser
 from utils import JobInput, create_error_response
@@ -71,20 +71,20 @@ def get_fd_engine_args() -> EngineArgs:
 
 class FastDeployEngine:
     def __init__(self):
-        log.info("Initializing FastDeploy LLM engine (RunPod adapter)...")
+        log.info("Initializing FastDeploy LLM engine (RunPod adapter, Async)...")
         self.engine_args = get_engine_args()
         log.info(f"Engine args: {self.engine_args}")
-        self.llm_engine = LLMEngine.from_engine_args(self.engine_args)
 
-        ok = self.llm_engine.start(api_server_pid=None)
+        self.llm_engine = AsyncLLMEngine.from_engine_args(self.engine_args)
+
+        ok = self.llm_engine.start()
         if not ok:
             raise RuntimeError("Failed to initialize FastDeploy LLM engine.")
 
-        # 给 handler 用的最大并发（你也可以直接写死）
         self.max_concurrency = int(os.getenv("MAX_CONCURRENCY", "512"))
 
-    # ===== 把 JobInput 映射成 FD 需要的 prompts dict =====
-    def _jobinput_to_prompts(self, job_input) -> Dict[str, Any]:
+    # ===== The prompt dictionary required to map JobInput to FD =====
+    def _jobinput_to_prompts(self, job_input: JobInput) -> Dict[str, Any]:
         """
         适配 utils.JobInput → FastDeploy LLMEngine 所需的 prompts dict。
         当前 JobInput 结构：
@@ -96,7 +96,7 @@ class FastDeployEngine:
         prompts: Dict[str, Any] = {}
 
         # ========== 1. 优先处理 OpenAI 兼容模式 ==========
-        if job_input.openai_route and job_input.openai_input:
+        if getattr(job_input, "openai_route", None) and getattr(job_input, "openai_input", None):
             route = job_input.openai_route
             body = job_input.openai_input or {}
 
@@ -164,7 +164,6 @@ class FastDeployEngine:
             return prompts
 
         # ========== 2. 非 OpenAI 模式：走“原始 llm_input / raw” ==========
-        # 你的 utils.JobInput 里没有 prompt 字段，只有 llm_input + raw
         llm_input = getattr(job_input, "llm_input", None)
 
         if llm_input is None:
@@ -209,69 +208,75 @@ class FastDeployEngine:
 
         return prompts
 
-
-    async def _generate_fd(
-        self,
-        llm_input,
-        request_id: str,
-        job_input: JobInput,
-        stream: bool = True
-    ) -> AsyncGenerator[Dict[str, Any], None]:
+    async def generate(self, job_input: JobInput) -> AsyncGenerator[Dict[str, Any], None]:
         prompts = self._jobinput_to_prompts(job_input)
-        loop = asyncio.get_running_loop()
-        queue: asyncio.Queue = asyncio.Queue()
-
-        def _worker():
-            try:
-                log.debug("==================== gougou1 ====================")
-                log.info(llm_input)
-                log.info(prompts)
-                log.debug("==================== gougou2 ====================")
-                # FastDeploy 的 generate 是同步 iterator
-                for out in self.llm_engine.generate(prompts, stream=stream):
-                    # out 通常是 dict，这里顺手塞个 request_id 进去，方便调试
-                    if isinstance(out, dict) and request_id is not None:
-                        out.setdefault("request_id", request_id)
-                    loop.call_soon_threadsafe(queue.put_nowait, out)
-            except Exception as e:
-                # 出错时，用 error payload 推回 async 侧
-                err_payload = {
-                    "error": {
-                        "message": str(e),
-                        "type": "FastDeployEngineError",
-                    }
-                }
-                loop.call_soon_threadsafe(queue.put_nowait, err_payload)
-            finally:
-                # 用 None 作为结束标记
-                loop.call_soon_threadsafe(queue.put_nowait, None)
-
-        # 启动后台线程
-        threading.Thread(target=_worker, daemon=True).start()
-
-        # async 侧消费队列里的数据，一条条往外 yield
-        while True:
-            item = await queue.get()
-            if item is None:
-                break
-            yield item
-
-
-    async def generate(self, job_input: JobInput):
-        log.debug("==================== Dump JobInput ====================")
-        log.debug(f"type(job_input) = {type(job_input)}")
-        try:
-            log.debug(f"job_input.__dict__ = {getattr(job_input, '__dict__', None)}")
-        except Exception as e:
-            log.debug(f"access __dict__ failed: {e}")
-        log.debug("==================== Dump JobInput END ====================")
         try:
             async for batch in self._generate_fd(
-                llm_input=job_input.llm_input,
+                llm_input=prompts,
                 stream=job_input.stream,
                 request_id=job_input.request_id,
-                job_input=job_input
+                validated_sampling_params=job_input.sampling_params,
             ):
                 yield batch
         except Exception as e:
             yield create_error_response(str(e))
+
+
+    async def _generate_fd(
+        self,
+        request_id: str,
+        llm_input,
+        validated_sampling_params,
+        stream: bool = True
+    ) -> AsyncGenerator[Dict[str, Any], None]:
+        results_generator = self.llm_engine.generate(llm_input, validated_sampling_params, request_id)
+        n_responses, n_input_tokens, is_first_output = validated_sampling_params.n, 0, True
+        last_output_texts, token_counters = ["" for _ in range(n_responses)], {"batch": 0, "total": 0}
+        
+        batch = {
+            "choices": [{"tokens": []} for _ in range(n_responses)],
+        }
+        async for request_output in results_generator:
+            if is_first_output:  # 只在第一步统计一次输入 token 数
+                n_input_tokens = len(request_output.prompt_token_ids)
+                is_first_output = False
+
+              # FastDeploy 这里是一个 CompletionOutput，而不是 list
+            completion = request_output.outputs
+            # 保险一点，兼容没有 text 的情况
+            output_index = getattr(completion, "index", 0)
+            full_text    = getattr(completion, "text", "") or ""   
+
+            token_counters["total"] += 1
+
+            if stream:
+                # 和 vLLM 一样，只拿增量
+                new_output = full_text[len(last_output_texts[output_index]):]
+                batch["choices"][output_index]["tokens"].append(new_output)
+                token_counters["batch"] += 1
+        
+                if token_counters["batch"] >= batch_size.current_batch_size:
+                    batch["usage"] = {
+                        "input": n_input_tokens,
+                        "output": token_counters["total"],
+                    }
+                    yield batch
+        
+                    # 重置本 batch
+                    batch = {
+                        "choices": [{"tokens": []} for _ in range(n_responses)],
+                    }
+                    token_counters["batch"] = 0
+                    batch_size.update()
+        
+            # 更新 last_output_texts，方便下次算“增量”
+            last_output_texts[output_index] = full_text
+        
+        if not stream:
+            for output_index, output in enumerate(last_output_texts):
+                batch["choices"][output_index]["tokens"] = [output]
+            token_counters["batch"] += 1
+
+        if token_counters["batch"] > 0:
+            batch["usage"] = {"input": n_input_tokens, "output": token_counters["total"]}
+            yield batch

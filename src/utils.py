@@ -2,6 +2,7 @@ import os
 import uuid
 import logging
 from http import HTTPStatus
+from fastdeploy.engine.sampling_params import SamplingParams 
 from functools import wraps
 from time import time
 
@@ -50,6 +51,10 @@ class JobInput:
         # 是否走 OpenAI 兼容路由（比如 /v1/chat/completions /v1/images/generations）
         self.openai_route = job.get("openai_route", False)
         self.openai_input = job.get("openai_input")
+        samp_param = job.get("sampling_params", {})
+        if "max_tokens" not in samp_param:
+            samp_param["max_tokens"] = 100
+        self.sampling_params = SamplingParams(**samp_param)
         self.request_id = str(uuid.uuid4())
         self.openai_route = job.get("openai_route")
         self.openai_input = job.get("openai_input")
