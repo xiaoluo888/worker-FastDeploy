@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         cmake \
         git \
         wget \
+        python3-dev \
         libglib2.0-0 \
         libsm6 \
         libxext6 \
@@ -28,14 +29,14 @@ RUN python3 -m pip install --upgrade pip
 # ---- install PaddleOCR and PaddleX ----
 RUN python3 -m pip install --no-cache-dir "paddleocr[doc-parser]" "paddlex==3.3.11"
 
-# ---- install PaddleX serving ----
-RUN paddlex --install serving
+# ---- install PaddleX serving as root ----
+RUN paddlex --install serving -v
 
 # ---- create user ----
 RUN groupadd -g 1000 paddleocr \
     && useradd -m -s /bin/bash -u 1000 -g 1000 paddleocr
 
-# ---- ENV: force PaddleX + HF to use offline cache ----
+# ---- environment variables for offline cache ----
 ENV HOME=/home/paddleocr
 ENV PADDLEX_HOME=/home/paddleocr/.paddlex
 ENV PADDLEX_MODEL_HOME=/home/paddleocr/.paddlex/official_models
@@ -66,6 +67,7 @@ fi
 COPY --chown=paddleocr:paddleocr /src/handler.py /src/handler.py
 COPY --chown=paddleocr:paddleocr ./pipeline_config_fastdeploy.yaml /home/paddleocr/pipeline_config_fastdeploy.yaml
 
+# ---- switch to paddleocr user ----
 USER paddleocr
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
