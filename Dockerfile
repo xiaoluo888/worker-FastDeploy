@@ -1,3 +1,5 @@
+ARG PADDLEOCR_VERSION=">=3.3.2,<3.4"
+
 FROM runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04
 
 # Install system dependencies
@@ -9,7 +11,7 @@ RUN apt-get update && apt-get install -y \
 
 # Install PaddlePaddle GPU 3.2.1 from official repo (CUDA 12.6 compatible with 12.4)
 RUN pip install paddlepaddle-gpu==3.2.1 -i https://www.paddlepaddle.org.cn/packages/stable/cu126/
-RUN python3 -m pip install fastdeploy-gpu==2.3.0 -i https://www.paddlepaddle.org.cn/packages/stable/fastdeploy-gpu-80_90/ 
+RUN python3 -m pip install fastdeploy-gpu==2.3.0 -i https://www.paddlepaddle.org.cn/packages/stable/fastdeploy-gpu-80_90/
 
 ENV PIP_NO_CACHE_DIR=0
 ENV PYTHONUNBUFFERED=1
@@ -18,9 +20,10 @@ RUN python -m pip install https://paddle-whl.bj.bcebos.com/nightly/cu126/safeten
 
 RUN echo "Installing PaddleOCR with version constraint: ${PADDLEOCR_VERSION}" && \
     python -m pip install --upgrade pip && \
-    python -m pip install "paddleocr[doc-parser]>=3.3.2,<3.4" \
-    python -m pip install "paddlex==3.3.11" \
-    && paddlex --install serving
+    python -m pip install "paddleocr[doc-parser]>=3.3.2,<3.4" && \
+    python -m pip install "paddlex==3.3.11" && \
+    python -m pip install "runpod>=1.8,<2.0" && \
+    paddlex --install serving
     
 # ---- create user ----
 RUN groupadd -g 1000 paddleocr \
@@ -54,8 +57,9 @@ RUN if [ "${BUILD_FOR_OFFLINE}" = "true" ]; then \
     wget -P ${PADDLEX_HOME}/fonts https://paddle-model-ecology.bj.bcebos.com/paddlex/PaddleX3.0/fonts/PingFang-SC-Regular.ttf; \
 fi
 
-# ---- copy code ----
+# ---- copy code and config ----
 COPY --chown=paddleocr:paddleocr /src/handler.py /src/handler.py
+COPY --chown=paddleocr:paddleocr ./pipeline_config_fastdeploy.yaml /home/paddleocr/pipeline_config_fastdeploy.yaml
 
 USER paddleocr
 
