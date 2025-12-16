@@ -8,11 +8,18 @@ ENV PYTHONDONTWRITEBYTECODE=1
 RUN python3 -m pip install https://paddle-whl.bj.bcebos.com/nightly/cu126/safetensors/safetensors-0.6.2.dev0-cp38-abi3-linux_x86_64.whl
 
 
-RUN echo "Installing PaddleOCR with version constraint: ${PADDLEOCR_VERSION}" && \
-    python -m pip install --upgrade pip && \
-    python -m pip install "paddleocr[doc-parser]" && \
-    python -m pip install "paddlex==3.3.11" && \
-    paddlex --install serving
+# Upgrade pip
+RUN python3 -m pip install --upgrade pip
+
+# Install PaddleOCR and PaddleX
+RUN python3 -m pip install --no-cache-dir "paddleocr[doc-parser]" "paddlex==3.3.11"
+
+# Ensure paddlex CLI is available
+ENV PATH=$PATH:/usr/local/bin
+
+# Install PaddleX serving
+RUN paddlex --install serving
+
     
 # ---- create user ----
 RUN groupadd -g 1000 paddleocr \
