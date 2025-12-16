@@ -1,7 +1,7 @@
 FROM xiaoluo888/worker-fastdeploy:latest
 
 # ---- environment ----
-ENV PIP_NO_CACHE_DIR=0
+ENV PIP_NO_CACHE_DIR=1
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PATH=$PATH:/usr/local/bin
@@ -27,6 +27,11 @@ RUN python3 -m pip install --upgrade pip
 
 # ---- install PaddleOCR and PaddleX ----
 RUN python3 -m pip install --no-cache-dir "paddleocr[doc-parser]" "paddlex==3.3.11"
+
+
+# ---- create user ----
+RUN groupadd -g 1000 paddleocr \
+    && useradd -m -s /bin/bash -u 1000 -g 1000 paddleocr
 
 # ---- environment variables for offline cache ----
 ENV HOME=/home/paddleocr
@@ -55,5 +60,6 @@ RUN if [ "${BUILD_FOR_OFFLINE}" = "true" ]; then \
     wget -P ${PADDLEX_HOME}/fonts https://paddle-model-ecology.bj.bcebos.com/paddlex/PaddleX3.0/fonts/PingFang-SC-Regular.ttf; \
 fi
 
-ENTRYPOINT ["/usr/bin/tini", "--"]
+# Copy handler
+COPY /src/handler.py /src/handler.py
 CMD ["python3", "/src/handler.py"]
