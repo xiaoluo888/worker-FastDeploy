@@ -30,7 +30,9 @@ RUN python3 -m pip install --upgrade pip
 RUN python3 -m pip install --no-cache-dir "paddleocr[doc-parser]" "paddlex==3.3.11"
 
 # ---- install PaddleX serving as root ----
-RUN paddlex --install serving -v
+USER root
+RUN paddlex --install serving
+
 
 # ---- create user ----
 RUN groupadd -g 1000 paddleocr \
