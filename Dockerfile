@@ -1,26 +1,36 @@
 FROM xiaoluo888/worker-fastdeploy:latest
 
-
+# ---- environment ----
 ENV PIP_NO_CACHE_DIR=0
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
-
-RUN python3 -m pip install https://paddle-whl.bj.bcebos.com/nightly/cu126/safetensors/safetensors-0.6.2.dev0-cp38-abi3-linux_x86_64.whl
-
-
-# Upgrade pip
-RUN python3 -m pip install --upgrade pip
-
-# Install PaddleOCR and PaddleX
-RUN python3 -m pip install --no-cache-dir "paddleocr[doc-parser]" "paddlex==3.3.11"
-
-# Ensure paddlex CLI is available
 ENV PATH=$PATH:/usr/local/bin
 
-# Install PaddleX serving
+# ---- install system dependencies ----
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        cmake \
+        git \
+        wget \
+        libglib2.0-0 \
+        libsm6 \
+        libxext6 \
+        libxrender1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# ---- install safetensors for CUDA 12.6 ----
+RUN python3 -m pip install --no-cache-dir https://paddle-whl.bj.bcebos.com/nightly/cu126/safetensors/safetensors-0.6.2.dev0-cp38-abi3-linux_x86_64.whl
+
+# ---- upgrade pip ----
+RUN python3 -m pip install --upgrade pip
+
+# ---- install PaddleOCR and PaddleX ----
+RUN python3 -m pip install --no-cache-dir "paddleocr[doc-parser]" "paddlex==3.3.11"
+
+# ---- install PaddleX serving ----
 RUN paddlex --install serving
 
-    
 # ---- create user ----
 RUN groupadd -g 1000 paddleocr \
     && useradd -m -s /bin/bash -u 1000 -g 1000 paddleocr
@@ -38,8 +48,7 @@ WORKDIR /home/paddleocr
 # ---- offline model baking ----
 ARG BUILD_FOR_OFFLINE=true
 RUN if [ "${BUILD_FOR_OFFLINE}" = "true" ]; then \
-    mkdir -p ${PADDLEX_MODEL_HOME} && \
-    cd ${PADDLEX_MODEL_HOME} && \
+    mkdir -p ${PADDLEX_MODEL_HOME} && cd ${PADDLEX_MODEL_HOME} && \
     wget https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/UVDoc_infer.tar \
          https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-LCNet_x1_0_doc_ori_infer.tar \
          https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-DocLayoutV2_infer.tar \
@@ -48,7 +57,7 @@ RUN if [ "${BUILD_FOR_OFFLINE}" = "true" ]; then \
     tar -xf PP-LCNet_x1_0_doc_ori_infer.tar && mv PP-LCNet_x1_0_doc_ori_infer PP-LCNet_x1_0_doc_ori && \
     tar -xf PP-DocLayoutV2_infer.tar && mv PP-DocLayoutV2_infer PP-DocLayoutV2 && \
     tar -xf PaddleOCR-VL_infer.tar && mv PaddleOCR-VL_infer PaddleOCR-VL && \
-    rm *.tar && \
+    rm -f *.tar && \
     mkdir -p ${PADDLEX_HOME}/fonts && \
     wget -P ${PADDLEX_HOME}/fonts https://paddle-model-ecology.bj.bcebos.com/paddlex/PaddleX3.0/fonts/PingFang-SC-Regular.ttf; \
 fi
