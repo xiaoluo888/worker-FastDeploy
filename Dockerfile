@@ -10,7 +10,7 @@ RUN python3 -m pip install https://paddle-whl.bj.bcebos.com/nightly/cu126/safete
 
 RUN echo "Installing PaddleOCR with version constraint: ${PADDLEOCR_VERSION}" && \
     python -m pip install --upgrade pip && \
-    python -m pip install "paddleocr[doc-parser]>=3.3.2,<3.4" && \
+    python -m pip install "paddleocr[doc-parser]" && \
     python -m pip install "paddlex==3.3.11" && \
     paddlex --install serving
     
