@@ -1,8 +1,11 @@
 FROM xiaoluo888/worker-fastdeploy:latest
 
 ARG PADDLEOCR_VERSION=">=3.3.2,<3.4"
-RUN python -m pip install "paddleocr[doc-parser]${PADDLEOCR_VERSION}"
+RUN echo "Installing PaddleOCR with version constraint: ${PADDLEOCR_VERSION}" && \
+    python -m pip install "paddleocr[doc-parser]${PADDLEOCR_VERSION}" || \
+    python -m pip install "paddleocr[doc-parser]" 
 
+    
 # ---- create user ----
 RUN groupadd -g 1000 paddleocr \
     && useradd -m -s /bin/bash -u 1000 -g 1000 paddleocr
