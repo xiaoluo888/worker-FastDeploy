@@ -66,5 +66,5 @@ USER paddleocr
 EXPOSE 8180
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD ["python3", "/src/handler.py"]
+
 CMD ["paddlex", "--serve", "--pipeline", "/home/paddleocr/pipeline_config_vllm.yaml"]
