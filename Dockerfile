@@ -55,9 +55,5 @@ RUN if [ "${BUILD_FOR_OFFLINE}" = "true" ]; then \
     wget -P ${PADDLEX_HOME}/fonts https://paddle-model-ecology.bj.bcebos.com/paddlex/PaddleX3.0/fonts/PingFang-SC-Regular.ttf; \
 fi
 
-# 🔥 THIS IS THE CRITICAL FIX
-RUN mkdir -p /home/paddleocr/.paddlex && \
-    chown -R paddleocr:paddleocr /home/paddleocr
-
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["python3", "/src/handler.py"]
