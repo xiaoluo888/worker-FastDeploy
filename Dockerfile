@@ -1,17 +1,4 @@
-ARG PADDLEOCR_VERSION=">=3.3.2,<3.4"
-
-FROM runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    libgl1-mesa-glx \
-    libglib2.0-0 \
-    poppler-utils \
-    && rm -rf /var/lib/apt/lists/*
- RUN ldconfig /usr/local/cuda-12.6/compat/
-# Install PaddlePaddle GPU 3.2.1 from official repo (CUDA 12.6 compatible with 12.4)
-RUN pip install paddlepaddle-gpu==3.2.1 -i https://www.paddlepaddle.org.cn/packages/stable/cu126/
-RUN python -m pip install fastdeploy-gpu==2.3.0 -i https://www.paddlepaddle.org.cn/packages/stable/fastdeploy-gpu-86_89/ --extra-index-url https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
+FROM xiaoluo888/worker-fastdeploy:latest
 
 
 ENV PIP_NO_CACHE_DIR=0
@@ -24,7 +11,6 @@ RUN echo "Installing PaddleOCR with version constraint: ${PADDLEOCR_VERSION}" &&
     python -m pip install --upgrade pip && \
     python -m pip install "paddleocr[doc-parser]>=3.3.2,<3.4" && \
     python -m pip install "paddlex==3.3.11" && \
-    python -m pip install "runpod>=1.8,<2.0" && \
     paddlex --install serving
     
 # ---- create user ----
