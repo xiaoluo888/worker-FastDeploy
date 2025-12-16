@@ -7,7 +7,6 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PATH=$PATH:/usr/local/bin
 
 # ---- install system dependencies ----
-USER root
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
         cmake \
@@ -28,11 +27,6 @@ RUN python3 -m pip install --upgrade pip
 
 # ---- install PaddleOCR and PaddleX ----
 RUN python3 -m pip install --no-cache-dir "paddleocr[doc-parser]" "paddlex==3.3.11"
-
-
-# ---- create user ----
-RUN groupadd -g 1000 paddleocr \
-    && useradd -m -s /bin/bash -u 1000 -g 1000 paddleocr
 
 # ---- environment variables for offline cache ----
 ENV HOME=/home/paddleocr
@@ -64,9 +58,6 @@ fi
 # 🔥 THIS IS THE CRITICAL FIX
 RUN mkdir -p /home/paddleocr/.paddlex && \
     chown -R paddleocr:paddleocr /home/paddleocr
-
-USER paddleocr
-
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["python3", "/src/handler.py"]
