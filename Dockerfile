@@ -1,9 +1,18 @@
-FROM xiaoluo888/worker-fastdeploy:latest
+ARG BASE_IMAGE="python:3.10"
+ARG PADDLEOCR_VERSION=">=3.3.2,<3.4"
 
+FROM ${BASE_IMAGE}
+
+ENV PIP_NO_CACHE_DIR=0
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+RUN python -m pip install https://paddle-whl.bj.bcebos.com/nightly/cu126/safetensors/safetensors-0.6.2.dev0-cp38-abi3-linux_x86_64.whl
+RUN python -m pip install paddlepaddle-gpu==3.2.1 -i https://www.paddlepaddle.org.cn/packages/stable/cu126/;
 
 RUN echo "Installing PaddleOCR with version constraint: ${PADDLEOCR_VERSION}" && \
     python -m pip install --upgrade pip && \
-    python -m pip install "paddleocr[doc-parser]" && \
+    python -m pip install "paddleocr[doc-parser]>=3.3.2,<3.4" \
+    && paddlex --install serving
     
 # ---- create user ----
 RUN groupadd -g 1000 paddleocr \
@@ -16,7 +25,6 @@ ENV PADDLEX_MODEL_HOME=/home/paddleocr/.paddlex/official_models
 ENV HF_HOME=/home/paddleocr/.cache/huggingface
 ENV TRANSFORMERS_CACHE=/home/paddleocr/.cache/huggingface
 ENV DISABLE_MODEL_SOURCE_CHECK=True
-ENV PYTHONUNBUFFERED=1
 
 WORKDIR /home/paddleocr
 
