@@ -11,7 +11,8 @@ RUN apt-get update && apt-get install -y \
 
 # Install PaddlePaddle GPU 3.2.1 from official repo (CUDA 12.6 compatible with 12.4)
 RUN pip install paddlepaddle-gpu==3.2.1 -i https://www.paddlepaddle.org.cn/packages/stable/cu126/
-RUN python3 -m pip install fastdeploy-gpu==2.3.0 -i https://www.paddlepaddle.org.cn/packages/stable/fastdeploy-gpu-80_90/
+RUN python -m pip install fastdeploy-gpu==2.3.0 -i https://www.paddlepaddle.org.cn/packages/stable/fastdeploy-gpu-86_89/ --extra-index-url https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
+
 
 ENV PIP_NO_CACHE_DIR=0
 ENV PYTHONUNBUFFERED=1
