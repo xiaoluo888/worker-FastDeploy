@@ -1,258 +1,0 @@
-[32m[2025-12-08 10:43:51,351] [    INFO][0m - Using download source: huggingface[0m
-[32m[2025-12-08 10:43:51,352] [    INFO][0m - Loading configuration file /root/PaddlePaddle/ERNIE-4.5-0.3B-Paddle/config.json[0m
-[33m[2025-12-08 10:43:51,352] [ WARNING][0m - You are using a model of type ernie4_5 to instantiate a model of type . This is not supported for all configurations of models and can yield errors.[0m
-/root/miniconda3/envs/runpod/lib/python3.10/site-packages/_distutils_hack/__init__.py:30: UserWarning: Setuptools is replacing distutils. Support for replacing an already imported distutils is deprecated. In the future, this condition will fail. Register concerns at https://github.com/pypa/setuptools/issues/new?template=distutils-deprecation.yml
-  warnings.warn(
-WARNING:legacy.fastdeploy:Ops of fastdeploy.model_executor.ops.cpu import failed, it may be not compiled.
-WARNING:legacy.fastdeploy:Ops of fastdeploy.model_executor.ops.gcu import failed, it may be not compiled.
-WARNING:legacy.fastdeploy:Ops of fastdeploy.model_executor.ops.iluvatar import failed, it may be not compiled.
-WARNING:legacy.fastdeploy:Ops of paddlenlp_ops import failed, it may be not compiled.
-WARNING:legacy.fastdeploy:Ops of fastdeploy.model_executor.ops.npu import failed, it may be not compiled.
-WARNING:legacy.fastdeploy:Ops of fastdeploy.model_executor.ops.xpu import failed, it may be not compiled.
-/root/miniconda3/envs/runpod/lib/python3.10/site-packages/fastdeploy/model_executor/graph_optimization/utils.py:21: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
-  import pynvml
-INFO:legacy.config:Parameter `COMPRESSION_RATIO` will use default value 1.0.
-INFO:legacy.config:The model format is Paddle
-INFO:legacy.config:cudagraph sizes specified by model runner [1, 2, 4, 8, 8] is overridden by config [8, 1, 2, 4]
-INFO:legacy.config:Doing profile, the total_block_num:144
-INFO:legacy.config:=================== Configuration Information ===============
-INFO:legacy.config:Model Configuration Information :
-INFO:legacy.config:model               :      /root/PaddlePaddle/ERNIE-4.5-0.3B-Paddle
-INFO:legacy.config:is_quantized        :      False
-INFO:legacy.config:max_model_len       :      2048
-INFO:legacy.config:dtype               :      bfloat16
-INFO:legacy.config:enable_logprob      :      False
-INFO:legacy.config:logprobs_mode       :      raw_logprobs
-INFO:legacy.config:enable_redundant_experts:      False
-INFO:legacy.config:redundant_experts_num:      0
-INFO:legacy.config:seed                :      0
-INFO:legacy.config:quantization        :      None
-INFO:legacy.config:pad_token_id        :      0
-INFO:legacy.config:eos_tokens_lens     :      2
-INFO:legacy.config:lm_head_fp32        :      False
-INFO:legacy.config:model_format        :      paddle
-INFO:legacy.config:runner              :      auto
-INFO:legacy.config:convert             :      auto
-INFO:legacy.config:pooler_config       :      None
-INFO:legacy.config:override_pooler_config:      None
-INFO:legacy.config:revision            :      master
-INFO:legacy.config:partial_rotary_factor:      1.0
-INFO:legacy.config:num_nextn_predict_layers:      0
-INFO:legacy.config:pretrained_config   :      PretrainedConfig {
-  "architectures": [
-    "Ernie4_5_ForCausalLM"
-  ],
-  "bos_token_id": 1,
-  "dtype": "bfloat16",
-  "eos_token_id": 2,
-  "head_dim": 128,
-  "hidden_act": "silu",
-  "hidden_size": 1024,
-  "intermediate_size": 3072,
-  "max_position_embeddings": 131072,
-  "num_attention_heads": 16,
-  "num_hidden_layers": 18,
-  "num_key_value_heads": 2,
-  "pad_token_id": 0,
-  "paddleformers_version": "0.4.0",
-  "rms_norm_eps": 1e-05,
-  "rope_theta": 500000,
-  "use_bias": false,
-  "use_rmsnorm": true,
-  "vocab_size": 103424
-}
-
-INFO:legacy.config:architectures       :      ['Ernie4_5_ForCausalLM']
-INFO:legacy.config:bos_token_id        :      1
-INFO:legacy.config:eos_token_id        :      2
-INFO:legacy.config:hidden_act          :      silu
-INFO:legacy.config:hidden_size         :      1024
-INFO:legacy.config:intermediate_size   :      3072
-INFO:legacy.config:max_position_embeddings:      131072
-INFO:legacy.config:model_type          :      ernie4_5
-INFO:legacy.config:num_attention_heads :      16
-INFO:legacy.config:num_key_value_heads :      2
-INFO:legacy.config:head_dim            :      128
-INFO:legacy.config:num_hidden_layers   :      18
-INFO:legacy.config:rms_norm_eps        :      1e-05
-INFO:legacy.config:use_cache           :      False
-INFO:legacy.config:vocab_size          :      103424
-INFO:legacy.config:rope_theta          :      500000
-INFO:legacy.config:use_rmsnorm         :      True
-INFO:legacy.config:tie_word_embeddings :      True
-INFO:legacy.config:use_bias            :      False
-INFO:legacy.config:top_p               :      1.0
-INFO:legacy.config:temperature         :      1.0
-INFO:legacy.config:penalty_score       :      1.0
-INFO:legacy.config:frequency_score     :      0.0
-INFO:legacy.config:presence_score      :      0.0
-INFO:legacy.config:min_length          :      1
-INFO:legacy.config:start_layer_index   :      0
-INFO:legacy.config:moe_num_shared_experts:      0
-INFO:legacy.config:moe_layer_start_index:      0
-INFO:legacy.config:num_max_dispatch_tokens_per_rank:      128
-INFO:legacy.config:moe_use_aux_free    :      False
-INFO:legacy.config:hidden_dropout_prob :      0.0
-INFO:legacy.config:initializer_range   :      0.02
-INFO:legacy.config:quantization_config :      None
-INFO:legacy.config:moe_num_experts     :      None
-INFO:legacy.config:moe_layer_end_index :      None
-INFO:legacy.config:ori_vocab_size      :      103424
-INFO:legacy.config:think_end_id        :      -1
-INFO:legacy.config:im_patch_id         :      -1
-INFO:legacy.config:line_break_id       :      -1
-INFO:legacy.config:is_unified_ckpt     :      True
-INFO:legacy.config:runner_type         :      generate
-INFO:legacy.config:convert_type        :      none
-INFO:legacy.config:is_reasoning_model  :      False
-INFO:legacy.config:enable_mm           :      False
-INFO:legacy.config:supported_tasks     :      ['generate']
-INFO:legacy.config:_model_info         :      ModelInfo(architecture='Ernie4_5_ForCausalLM', category=<ModelCategory.TEXT_GENERATION: 1>, is_text_generation=True, is_multimodal=False, is_reasoning=False, is_pooling=False, module_path='ernie4_5_moe', default_pooling_type='LAST')
-INFO:legacy.config:_architecture       :      Ernie4_5_ForCausalLM
-INFO:legacy.config:mla_use_absorb      :      False
-INFO:legacy.config:max_stop_seqs_num   :      5
-INFO:legacy.config:stop_seqs_max_len   :      8
-INFO:legacy.config:compression_ratio   :      1.0
-INFO:legacy.config:model_config        :      {'architectures': ['Ernie4_5_ForCausalLM'], 'bos_token_id': 1, 'eos_token_id': 2, 'hidden_act': 'silu', 'hidden_size': 1024, 'intermediate_size': 3072, 'max_position_embeddings': 131072, 'model_type': 'ernie4_5', 'num_attention_heads': 16, 'num_key_value_heads': 2, 'head_dim': 128, 'num_hidden_layers': 18, 'pad_token_id': 0, 'rms_norm_eps': 1e-05, 'use_cache': False, 'vocab_size': 103424, 'rope_theta': 500000, 'use_rmsnorm': True, 'tie_word_embeddings': True, 'use_bias': False, 'dtype': 'bfloat16'}
-INFO:legacy.config:kv_num_head         :      2
-INFO:legacy.config:moe_phase           :      <fastdeploy.config.MoEPhase object at 0x7fa8e792e620>
-INFO:legacy.config:=============================================================
-INFO:legacy.config:Cache Configuration Information :
-INFO:legacy.config:block_size          :      64
-INFO:legacy.config:gpu_memory_utilization:      0.9
-INFO:legacy.config:num_gpu_blocks_override:      None
-INFO:legacy.config:kv_cache_ratio      :      0.75
-INFO:legacy.config:enc_dec_block_num   :      2
-INFO:legacy.config:prealloc_dec_block_slot_num_threshold:      12
-INFO:legacy.config:cache_dtype         :      bfloat16
-INFO:legacy.config:model_cfg           :      <fastdeploy.config.ModelConfig object at 0x7fa948c0fca0>
-INFO:legacy.config:enable_chunked_prefill:      True
-INFO:legacy.config:rdma_comm_ports     :      None
-INFO:legacy.config:cache_transfer_protocol:      ipc
-INFO:legacy.config:pd_comm_port        :      None
-INFO:legacy.config:enable_prefix_caching:      True
-INFO:legacy.config:enable_ssd_cache    :      False
-INFO:legacy.config:cache_queue_port    :      [0]
-INFO:legacy.config:swap_space          :      None
-INFO:legacy.config:max_encoder_cache   :      0
-INFO:legacy.config:max_processor_cache :      -1
-INFO:legacy.config:enable_hierarchical_cache:      False
-INFO:legacy.config:each_token_cache_space:      9216
-INFO:legacy.config:bytes_per_block     :      589824
-INFO:legacy.config:bytes_per_layer_per_block:      32768
-INFO:legacy.config:num_cpu_blocks      :      0
-INFO:legacy.config:dec_token_num       :      128
-INFO:legacy.config:total_block_num     :      144
-INFO:legacy.config:prefill_kvcache_block_num:      144
-INFO:legacy.config:max_block_num_per_seq:      32
-INFO:legacy.config:=============================================================
-INFO:legacy.fastdeploy:LocalScheduler Configuration Information :
-INFO:legacy.fastdeploy:max_size            :      -1
-INFO:legacy.fastdeploy:ttl                 :      900
-INFO:legacy.fastdeploy:max_model_len       :      2048
-INFO:legacy.fastdeploy:enable_chunked_prefill:      True
-INFO:legacy.fastdeploy:max_num_partial_prefills:      1
-INFO:legacy.fastdeploy:max_long_partial_prefills:      1
-INFO:legacy.fastdeploy:long_prefill_token_threshold:      81
-INFO:legacy.fastdeploy:=============================================================
-INFO:legacy.config:Parallel Configuration Information :
-INFO:legacy.config:sequence_parallel   :      False
-INFO:legacy.config:use_ep              :      False
-INFO:legacy.config:msg_queue_id        :      1
-INFO:legacy.config:tensor_parallel_rank:      0
-INFO:legacy.config:tensor_parallel_size:      1
-INFO:legacy.config:expert_parallel_rank:      0
-INFO:legacy.config:expert_parallel_size:      1
-INFO:legacy.config:data_parallel_size  :      1
-INFO:legacy.config:enable_expert_parallel:      False
-INFO:legacy.config:local_data_parallel_id:      0
-INFO:legacy.config:engine_worker_queue_port:      ['0']
-INFO:legacy.config:device_ids          :      7
-INFO:legacy.config:first_token_id      :      1
-INFO:legacy.config:engine_pid          :      None
-INFO:legacy.config:do_profile          :      False
-INFO:legacy.config:pod_ip              :      None
-INFO:legacy.config:disable_custom_all_reduce:      False
-INFO:legacy.config:pd_disaggregation_mode:      None
-INFO:legacy.config:=============================================================
-INFO:legacy.config:speculative_config  :      {"method_list": ["ngram_match", "mtp"], "mtp_strategy_list": ["default", "with_ngram"], "mtp_strategy": "default", "num_speculative_tokens": 1, "num_model_steps": 1, "max_candidate_len": 5, "verify_window": 2, "max_ngram_size": 5, "min_ngram_size": 2, "model": "/root/PaddlePaddle/ERNIE-4.5-0.3B-Paddle", "num_gpu_block_expand_ratio": 1, "model_type": "main", "benchmark_mode": false, "num_extra_cache_layer": 0, "model_config": {}}
-INFO:legacy.config:device_config       :      None
-INFO:legacy.config:load_config         :      {"load_choices": "default_v1", "use_fastsafetensor": false, "dynamic_load_weight": false, "load_strategy": "normal"}
-INFO:legacy.config:quant_config        :      None
-INFO:legacy.config:graph_opt_config    :      {"graph_opt_level": 0, "sot_warmup_sizes": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 16, 32, 64, 128], "use_cudagraph": true, "cudagraph_capture_sizes": [8, 4, 2, 1], "cudagraph_num_of_warmups": 2, "cudagraph_copy_inputs": false, "cudagraph_splitting_ops": [], "cudagraph_only_prefill": false, "full_cuda_graph": true, "max_capture_size": 8, "real_shape_to_captured_size": {"4": 4, "5": 8, "6": 8, "7": 8, "2": 2, "3": 4, "1": 1, "0": 0, "8": 8}, "use_unique_memory_pool": true, "draft_model_use_cudagraph": false}
-INFO:legacy.config:early_stop_config   :      {"enable_early_stop": false, "strategy": "repetition", "window_size": 3000, "threshold": 0.99}
-INFO:legacy.config:plas_attention_config:      {"plas_encoder_top_k_left": null, "plas_encoder_top_k_right": null, "plas_decoder_top_k_left": null, "plas_decoder_top_k_right": null, "plas_use_encoder_seq_limit": null, "plas_use_decoder_seq_limit": null, "plas_block_size": 128, "mlp_weight_name": "plas_attention_mlp_weight.safetensors", "plas_max_seq_length": 131072}
-INFO:legacy.config:structured_outputs_config:      {"reasoning_parser": null, "guided_decoding_backend": "off", "disable_any_whitespace": true, "logits_processors": null}
-INFO:legacy.config:tokenizer           :      /root/PaddlePaddle/ERNIE-4.5-0.3B-Paddle
-INFO:legacy.config:ips                 :      None
-INFO:legacy.config:tool_parser         :      None
-INFO:legacy.config:master_ip           :      0.0.0.0
-INFO:legacy.config:host_ip             :      10.63.64.227
-INFO:legacy.config:nnode               :      1
-INFO:legacy.config:node_rank           :      0
-INFO:legacy.config:limit_mm_per_prompt :      None
-INFO:legacy.config:mm_processor_kwargs :      None
-INFO:legacy.config:use_warmup          :      0
-INFO:legacy.config:innode_prefill_ports:      None
-INFO:legacy.config:max_num_partial_prefills:      1
-INFO:legacy.config:max_long_partial_prefills:      1
-INFO:legacy.config:long_prefill_token_threshold:      81
-INFO:legacy.config:max_prefill_batch   :      3
-INFO:legacy.config:max_chips_per_node  :      8
-INFO:legacy.config:worker_num_per_node :      1
-INFO:legacy.config:local_device_ids    :      ['7']
-INFO:legacy.config:is_master           :      True
-INFO:legacy.config:paddle_commit_id    :      d90d3ad913b1f13a258af5e8c035e389282ccbac
-INFO:legacy.config:=============================================================
-INFO:legacy.prefix_cache_manager:num_gpu_blocks_server_owned 144 num_cpu_blocks 0, bytes_per_layer_per_block 32768
-INFO:legacy.fastdeploy:ResourceManager info, total_block_number: 144, total_batch_number: 8, available_block_num: 144, available_batch: 8
-running_reqs: 0, block_usage: 0.00%, batch_usage: 0.00%
-INFO:legacy.fastdeploy:Starting engine worker queue server service at ('0.0.0.0', 0)
-INFO:legacy.fastdeploy:EngineWorkerQueue server started.
-INFO:legacy.cache_queue_manager:EngineCacheQueue server started at ('0.0.0.0', 20813)
-INFO:legacy.fastdeploy:local 0
-INFO:legacy.fastdeploy:Connected EngineWorkerQueue client_id: 0, number of connected clients: 1
-INFO:legacy.fastdeploy:current_suffix: 13935
-INFO:legacy.config:disaggregate_info: {}
-INFO:legacy.data_processor:model_name_or_path: /root/PaddlePaddle/ERNIE-4.5-0.3B-Paddle
-[32m[2025-12-08 10:43:52,361] [    INFO][0m - Using download source: huggingface[0m
-[32m[2025-12-08 10:43:52,361] [    INFO][0m - Loading configuration file /root/PaddlePaddle/ERNIE-4.5-0.3B-Paddle/generation_config.json[0m
-/root/miniconda3/envs/runpod/lib/python3.10/site-packages/paddleformers/generation/configuration_utils.py:250: UserWarning: using greedy search strategy. However, `temperature` is set to `0.8` -- this flag is only used in sample-based generation modes. You should set `decode_strategy="greedy_search" ` or unset `temperature`. This was detected when initializing the generation config instance, which means the corresponding file may hold incorrect parameterization and should be fixed.
-  warnings.warn(
-/root/miniconda3/envs/runpod/lib/python3.10/site-packages/paddleformers/generation/configuration_utils.py:255: UserWarning: using greedy search strategy. However, `top_p` is set to `0.8` -- this flag is only used in sample-based generation modes. You should set `decode_strategy="greedy_search" ` or unset `top_p`. This was detected when initializing the generation config instance, which means the corresponding file may hold incorrect parameterization and should be fixed.
-  warnings.warn(
-[33m[2025-12-08 10:43:52,362] [ WARNING][0m - PretrainedTokenizer will be deprecated and removed in the next major release. Please migrate to Hugging Face's transformers.PreTrainedTokenizer. Checkout paddleformers/transformers/qwen/tokenizer.py for an example: use class QWenTokenizer(PaddleTokenizerMixin, hf.PreTrainedTokenizer) to support multisource download and Paddle tokenizer operations.[0m
-INFO:legacy.data_processor:tokenizer information: bos_token is <s>                                    1,                                    eos_token is </s>, 2 
-INFO:legacy.fastdeploy:No </think> token found in vocabulary, the model can not do reasoning.
-INFO:legacy.fastdeploy:Launch worker service command: ENABLE_FASTDEPLOY_LOAD_MODEL_CONCURRENCY=0 LOAD_STATE_DICT_THREAD_NUM=1 PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python NCCL_ALGO=Ring FLAGS_max_partition_size=1024 SOT_LOG_LEVEL=0 SOT_UNSAFE_CACHE_FASTPATH=1 SOT_ENABLE_0_SIZE_FALLBACK=0 SOT_SPECIALIZED_DIM_NUMBERS=no FLAGS_specialize_device_in_dy2st=1 FLAGS_enable_async_fast_gc=0 FLAGS_pir_interpreter_record_stream_for_gc_cache=1 FLAGS_parameters_persistent_mode_in_dy2st=1  /root/miniconda3/envs/runpod/bin/python -u -m paddle.distributed.launch --log_dir log --devices 7 /root/miniconda3/envs/runpod/lib/python3.10/site-packages/fastdeploy/engine/../worker/worker_process.py --max_num_seqs 8 --max_model_len 2048 --gpu_memory_utilization 0.9 --model /root/PaddlePaddle/ERNIE-4.5-0.3B-Paddle --device_ids 7 --tensor_parallel_size 1 --engine_worker_queue_port 13935 --pod_ip 0.0.0.0 --block_size 64 --enc_dec_block_num 2 --eos_tokens_lens 1 --pad_token_id 0 --engine_pid 13935 --max_num_batched_tokens 8192 --splitwise_role mixed --kv_cache_ratio 0.75 --expert_parallel_size 1 --data_parallel_size 1 --quantization 'null' --ori_vocab_size 100295 --think_end_id -1 --image_patch_id 100295 --line_break_id -1 --speculative_config '{"method_list": ["ngram_match", "mtp"], "mtp_strategy_list": ["default", "with_ngram"], "mtp_strategy": "default", "num_speculative_tokens": 1, "num_model_steps": 1, "max_candidate_len": 5, "verify_window": 2, "max_ngram_size": 5, "min_ngram_size": 2, "model": "/root/PaddlePaddle/ERNIE-4.5-0.3B-Paddle", "num_gpu_block_expand_ratio": 1, "model_type": "main", "benchmark_mode": false, "num_extra_cache_layer": 0, "model_config": {}}' --graph_optimization_config '{"graph_opt_level": 0, "sot_warmup_sizes": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 16, 32, 64, 128], "use_cudagraph": true, "cudagraph_capture_sizes": [8, 4, 2, 1], "cudagraph_num_of_warmups": 2, "cudagraph_copy_inputs": false, "cudagraph_splitting_ops": [], "cudagraph_only_prefill": false, "full_cuda_graph": true, "max_capture_size": 8, "real_shape_to_captured_size": {"4": 4, "5": 8, "6": 8, "7": 8, "2": 2, "3": 4, "1": 1, "0": 0, "8": 8}, "use_unique_memory_pool": true, "draft_model_use_cudagraph": false}' --guided_decoding_backend off --load_strategy normal --early_stop_config '{"enable_early_stop": false, "strategy": "repetition", "window_size": 3000, "threshold": 0.99}' --reasoning_parser None --load_choices default_v1 --plas_attention_config '{"plas_block_size": 128, "mlp_weight_name": "plas_attention_mlp_weight.safetensors", "plas_max_seq_length": 131072}' --ips None --max_encoder_cache 0 --cache-transfer-protocol ipc --runner auto --convert auto --override-pooler-config None --logprobs_mode raw_logprobs --enable_prefix_caching --enable_chunked_prefill --do_profile --disable_any_whitespace 2>log/launch_worker.log
-INFO     2025-12-08 10:43:54,185 130956 engine.py[line:144] Waiting for worker processes to be ready...
-INFO:legacy.console:Waiting for worker processes to be ready...
-Loading Weights:   0%|          | 0/100 [00:00<?, ?it/s]Loading Weights:   0%|          | 0/100 [00:00<?, ?it/s]Loading Weights:   0%|          | 0/100 [00:00<?, ?it/s]Loading Weights:   0%|          | 0/100 [00:00<?, ?it/s]Loading Weights:   0%|          | 0/100 [00:01<?, ?it/s]Loading Weights:   0%|          | 0/100 [00:01<?, ?it/s]Loading Weights:   0%|          | 0/100 [00:01<?, ?it/s]Loading Weights:   0%|          | 0/100 [00:01<?, ?it/s]Loading Weights:   0%|          | 0/100 [00:02<?, ?it/s]Loading Weights:   0%|          | 0/100 [00:02<?, ?it/s]Loading Weights:   0%|          | 0/100 [00:02<?, ?it/s]Loading Weights:   0%|          | 0/100 [00:02<?, ?it/s]Loading Weights:   0%|          | 0/100 [00:03<?, ?it/s]Loading Weights:   0%|          | 0/100 [00:03<?, ?it/s]Loading Weights:   0%|          | 0/100 [00:03<?, ?it/s]Loading Weights:   0%|          | 0/100 [00:03<?, ?it/s]Loading Weights:   0%|          | 0/100 [00:04<?, ?it/s]Loading Weights:   0%|          | 0/100 [00:04<?, ?it/s]Loading Weights:   0%|          | 0/100 [00:04<?, ?it/s]Loading Weights:   0%|          | 0/100 [00:04<?, ?it/s]Loading Weights:   0%|          | 0/100 [00:05<?, ?it/s]Loading Weights:   0%|          | 0/100 [00:05<?, ?it/s]Loading Weights:   0%|          | 0/100 [00:05<?, ?it/s]Loading Weights:   0%|          | 0/100 [00:05<?, ?it/s]Loading Weights:   0%|          | 0/100 [00:06<?, ?it/s]Loading Weights:   0%|          | 0/100 [00:06<?, ?it/s]Loading Weights:   0%|          | 0/100 [00:06<?, ?it/s]Loading Weights:   0%|          | 0/100 [00:06<?, ?it/s]Loading Weights:   0%|          | 0/100 [00:07<?, ?it/s]Loading Weights:   0%|          | 0/100 [00:07<?, ?it/s]Loading Weights:   0%|          | 0/100 [00:07<?, ?it/s]Loading Weights:   0%|          | 0/100 [00:07<?, ?it/s]Loading Weights:   0%|          | 0/100 [00:08<?, ?it/s]Loading Weights:   0%|          | 0/100 [00:08<?, ?it/s]Loading Weights:   0%|          | 0/100 [00:08<?, ?it/s]Loading Weights:   0%|          | 0/100 [00:08<?, ?it/s]Loading Weights:   0%|          | 0/100 [00:09<?, ?it/s]Loading Weights:   0%|          | 0/100 [00:09<?, ?it/s]Loading Weights:   0%|          | 0/100 [00:09<?, ?it/s]Loading Weights:   0%|          | 0/100 [00:09<?, ?it/s]Loading Weights: 100%|██████████| 100/100 [00:10<00:00, 199.76it/s]Loading Weights: 100%|██████████| 100/100 [00:10<00:00, 199.76it/s]Loading Weights: 100%|██████████| 100/100 [00:10<00:00,  9.51it/s] 
-Loading Layers:   0%|          | 0/100 [00:00<?, ?it/s]Loading Layers:   0%|          | 0/100 [00:00<?, ?it/s]INFO:legacy.config:Reset block num, the total_block_num:40000, prefill_kvcache_block_num:40000
-Loading Layers:   0%|          | 0/100 [00:00<?, ?it/s]Loading Layers:   0%|          | 0/100 [00:00<?, ?it/s]INFO:legacy.cache_queue_manager:Connected EngineCacheQueue client_id: 0
-INFO:legacy.prefix_cache_manager:Launch cache transfer manager, command:FLAGS_allocator_strategy=auto_growth CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 NCCL_MAX_NCHANNELS=1 NCCL_BUFFSIZE=0 FD_ENABLE_SWAP_SPACE_CLEARING=0 /root/miniconda3/envs/runpod/bin/python /root/miniconda3/envs/runpod/lib/python3.10/site-packages/fastdeploy/cache_manager/cache_transfer_manager.py --device_id 7 --rank 0 --splitwise_role mixed --num_layers 18 --head_dim 128 --kv_num_head 2 --mp_num 1 --cache_dtype bfloat16 --cache_queue_port 20813 --enable_splitwise 0 --pod_ip 0.0.0.0 --engine_worker_queue_port 13935 --num_gpu_blocks 40000 --num_cpu_blocks 0 --bytes_per_layer_per_block 32768 --block_size 64 --engine_pid 13935 --protocol ipc --local_data_parallel_id 0 --rdma_port 0 --speculative_config '{"method_list": ["ngram_match", "mtp"], "mtp_strategy_list": ["default", "with_ngram"], "mtp_strategy": "default", "num_speculative_tokens": 1, "num_model_steps": 1, "max_candidate_len": 5, "verify_window": 2, "max_ngram_size": 5, "min_ngram_size": 2, "model": "/root/PaddlePaddle/ERNIE-4.5-0.3B-Paddle", "num_gpu_block_expand_ratio": 1, "model_type": "main", "benchmark_mode": false, "num_extra_cache_layer": 0, "model_config": {}}' >log/launch_cache_transfer_manager_7.log 2>&1
-INFO:legacy.prefix_cache_manager:PrefixCacheManager is waiting for kv cache to be initialized.
-Loading Layers:   0%|          | 0/100 [00:01<?, ?it/s]Loading Layers:   0%|          | 0/100 [00:01<?, ?it/s]Loading Layers:   0%|          | 0/100 [00:01<?, ?it/s]Loading Layers:   0%|          | 0/100 [00:01<?, ?it/s]INFO:legacy.prefix_cache_manager:Launch cache transfer manager successful
-INFO:legacy.prefix_cache_manager:Start a thread to clear prefix cache when model weights are cleared.
-Loading Layers:   0%|          | 0/100 [00:02<?, ?it/s]Loading Layers:   0%|          | 0/100 [00:02<?, ?it/s]Loading Layers: 100%|██████████| 100/100 [00:02<00:00, 199.75it/s]Loading Layers: 100%|██████████| 100/100 [00:02<00:00, 199.75it/s]Loading Layers: 100%|██████████| 100/100 [00:03<00:00, 33.29it/s] 
-INFO     2025-12-08 10:44:12,980 130956 engine.py[line:190] Worker processes are launched with 21.182917833328247 seconds.
-INFO:legacy.console:Worker processes are launched with 21.182917833328247 seconds.
-INFO     2025-12-08 10:44:12,981 130956 engine.py[line:201] Detected 40000 gpu blocks and 0 cpu blocks in cache (block size: 64).
-INFO:legacy.console:Detected 40000 gpu blocks and 0 cpu blocks in cache (block size: 64).
-INFO     2025-12-08 10:44:12,981 130956 engine.py[line:204] FastDeploy will be serving 8 running requests if each sequence reaches its maximum length: 2048
-INFO:legacy.console:FastDeploy will be serving 8 running requests if each sequence reaches its maximum length: 2048
---- Starting Serverless Worker |  Version 1.8.1 ---
-INFO   | Using test_input.json as job input.
-DEBUG  | Retrieved local job: {'input': {'openai_route': '/v1/chat/completions', 'openai_input': {'messages': [{'role': 'system', 'content': 'You are a helpful assistant that writes concise responses.'}, {'role': 'user', 'content': 'Explain what a neural network is in one sentence.'}], 'max_tokens': 200, 'temperature': 0.1}}, 'id': 'local_test'}
-INFO   | local_test | Started.
-DEBUG  | local_test | Handler output: <async_generator object handler at 0x7fabde147e40>
-DEBUG  | local_test | run_job return: {'output': <async_generator object handler at 0x7fabde147e40>}
-INFO   | Job local_test completed successfully.
-INFO   | Job result: {'output': <async_generator object handler at 0x7fabde147e40>}
-INFO   | Local testing complete, exiting.
-INFO:legacy.fastdeploy:Engine shut down, exiting sub services...
-INFO:legacy.fastdeploy:Thread pool shutdown detected, exiting scheduler loop
-INFO:legacy.fastdeploy:Killing cache manager process 131458
-INFO:legacy.fastdeploy:Exit sub services.....
-/root/miniconda3/envs/runpod/lib/python3.10/multiprocessing/resource_tracker.py:224: UserWarning: resource_tracker: There appear to be 2 leaked shared_memory objects to clean up at shutdown
-  warnings.warn('resource_tracker: There appear to be %d '
