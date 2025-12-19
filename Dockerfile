@@ -1,4 +1,4 @@
-# ========================= 使用百度基础镜像构建新的FD环境 =========================
+# # ========================= 使用基础镜像构建新的FD环境 =========================
 # FROM nvidia/cuda:12.6.0-base-ubuntu22.04 
 
 # RUN apt-get update -y \
@@ -7,11 +7,10 @@
 # RUN ldconfig /usr/local/cuda-12.6/compat/
 
 # # Install Python dependencies
-# COPY builder/requirements.txt /requirements.txt
 # RUN --mount=type=cache,target=/root/.cache/pip \
 #     python3 -m pip install --upgrade pip && \
-#     python3 -m pip install paddlepaddle-gpu==3.2.2 -i https://www.paddlepaddle.org.cn/packages/stable/cu126/ && \
-#     python3 -m pip install fastdeploy-gpu==2.3.0 -i https://www.paddlepaddle.org.cn/packages/stable/fastdeploy-gpu-80_90/ 
+#     python3 -m pip install --pre paddlepaddle-gpu -i https://www.paddlepaddle.org.cn/packages/nightly/cu126/ && \
+#     python3 -m pip install fastdeploy-gpu -i https://www.paddlepaddle.org.cn/packages/nightly/fastdeploy-gpu-80_90/ --extra-index-url https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
 
 # # 避免交互 & 打印不缓冲
 # ENV DEBIAN_FRONTEND=noninteractive \

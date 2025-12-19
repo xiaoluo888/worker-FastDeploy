@@ -7,7 +7,8 @@ import asyncio
 from typing import AsyncGenerator, Dict, Any
 
 from fastdeploy.engine.args_utils import EngineArgs
-from fastdeploy.engine.async_llm import AsyncLLMEngine 
+# from fastdeploy.engine.engine import LLMEngine 
+from fastdeploy.engine.async_llm import AsyncLLM
 from fastdeploy.entrypoints.openai.utils import make_arg_parser
 from fastdeploy.utils import FlexibleArgumentParser
 from utils import JobInput, create_error_response
@@ -75,7 +76,7 @@ class FastDeployEngine:
         self.engine_args = get_engine_args()
         log.info(f"Engine args: {self.engine_args}")
 
-        self.llm_engine = AsyncLLMEngine.from_engine_args(self.engine_args)
+        self.llm_engine = LLMEngine.from_engine_args(self.engine_args)
 
         ok = self.llm_engine.start()
         if not ok:
@@ -210,6 +211,9 @@ class FastDeployEngine:
 
     async def generate(self, job_input: JobInput) -> AsyncGenerator[Dict[str, Any], None]:
         prompts = self._jobinput_to_prompts(job_input)
+        log.debug("==============================================================================")
+        log.debug(job_input.stream)
+        log.debug("==============================================================================")
         try:
             async for batch in self._generate_fd(
                 llm_input=prompts,
@@ -227,7 +231,7 @@ class FastDeployEngine:
         request_id: str,
         llm_input,
         validated_sampling_params,
-        stream: bool = True
+        stream
     ) -> AsyncGenerator[Dict[str, Any], None]:
         results_generator = self.llm_engine.generate(llm_input, validated_sampling_params, request_id)
         n_responses, n_input_tokens, is_first_output = validated_sampling_params.n, 0, True
@@ -241,7 +245,7 @@ class FastDeployEngine:
                 n_input_tokens = len(request_output.prompt_token_ids)
                 is_first_output = False
 
-              # FastDeploy 这里是一个 CompletionOutput，而不是 list
+            # FastDeploy 这里是一个 CompletionOutput，而不是 list
             completion = request_output.outputs
             # 保险一点，兼容没有 text 的情况
             output_index = getattr(completion, "index", 0)
