@@ -1,6 +1,6 @@
 {
   "input": {
-    "prompt": "介绍一下百度.",
+    "prompt": "介绍一下谷歌.",
     "max_tokens": 128
   }
 }

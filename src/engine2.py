@@ -2,6 +2,7 @@
 import os
 import json
 import uuid
+import time
 import asyncio
 from dataclasses import is_dataclass, replace
 from typing import Any, Dict, AsyncGenerator, Optional
@@ -159,12 +160,15 @@ class FastDeployEngine:
             break
 
     async def generate(self, job_input: JobInput) -> AsyncGenerator[Dict[str, Any], None]:
+        log.debug("==============================================================================")
+        log.debug(job_input.stream)
+        log.debug("==============================================================================")
         try:
             await self._ensure_ready()
 
             prompt_dict = self._build_prompt_dict(job_input)
             request_id = getattr(job_input, "request_id", None) or f"cmpl-{uuid.uuid4().hex[:12]}"
-            stream = getattr(job_input, "stream", True)
+            stream = getattr(job_input, "stream", False)
             sp = getattr(job_input, "sampling_params", None)
 
             n = getattr(sp, "n", None)
@@ -185,14 +189,13 @@ class FastDeployEngine:
             ):
                 yield batch
 
-
-
         except asyncio.CancelledError:
             rid = getattr(job_input, "request_id", None) or "unknown"
             await self._maybe_abort(rid)
             raise
         except Exception as e:
             yield create_error_response(str(e))
+
 
     async def _generate_fd(
         self,
@@ -201,7 +204,7 @@ class FastDeployEngine:
         sampling_params: Any,
         stream: bool,
     ) -> AsyncGenerator[Dict[str, Any], None]:
-        # FD AsyncLLm
+        # FD AsyncLLM: returns AsyncGenerator[RequestOutput]
         results = self.llm.generate(prompt_dict, sampling_params, request_id)
 
         # n_responses：如果 sampling_params=None，就当 1
@@ -211,8 +214,12 @@ class FastDeployEngine:
                 n_responses = int(getattr(sampling_params, "n", 1) or 1)
             except Exception:
                 n_responses = 1
+        if n_responses <= 0:
+            n_responses = 1
 
+        # 用于累计“最终全文”（可选，但建议保留，方便非 stream 或最后 flush）
         last_output_texts = ["" for _ in range(n_responses)]
+
         token_counters = {"batch": 0, "total": 0}
         n_input_tokens = 0
         first = True
@@ -232,46 +239,42 @@ class FastDeployEngine:
                 out_list = outputs
             else:
                 out_list = [outputs]
+
             for out in out_list:
                 idx = int(getattr(out, "index", 0) or 0)
                 if idx >= n_responses:
                     continue
 
-                full_text = getattr(out, "text", "") or ""
-                prev_text = last_output_texts[idx]
-
+                # ✅ 关键：在你现在的 processor(stream=True) 语义下，out.text 是 delta
+                delta = getattr(out, "text", "") or ""
 
                 if stream:
-                    new_piece = full_text[len(prev_text):] if len(full_text) >= len(prev_text) else full_text
-                    if new_piece:
-                        batch["choices"][idx]["tokens"].append(new_piece)
+                    if delta:
+                        batch["choices"][idx]["tokens"].append(delta)
                         token_counters["batch"] += 1
                         token_counters["total"] += 1
 
+                    # 达到阈值就 flush 一次
                     if token_counters["batch"] >= self.batch_size.current_batch_size:
                         batch["usage"] = {"input": n_input_tokens, "output": token_counters["total"]}
                         yield batch
+
                         batch = {"choices": [{"tokens": []} for _ in range(n_responses)]}
                         token_counters["batch"] = 0
                         self.batch_size.update()
 
-                last_output_texts[idx] = full_text
-        
+                # ✅ 累计全文（不会被最后一包 delta='' 覆盖掉）
+                if delta:
+                    last_output_texts[idx] += delta
 
-
+        # 循环结束后做最后一次 flush
         if not stream:
-            log.info("===================================================================11")
-            log.info(f"last_output_texts type={type(last_output_texts)} len={len(last_output_texts)} id={id(last_output_texts)}")
-            log.info(f"last_output_texts repr={last_output_texts!r}")
-            token_counters["total"] += sum(len(x) for x in last_output_texts if isinstance(x, str))
-            log.info(f"token_counters={token_counters}")
-            log.info("===================================================================22")
-            for output_index, output in enumerate(last_output_texts):
-                batch["choices"][output_index]["tokens"] = [output]
-            token_counters["batch"] += 1
-
-        if token_counters["batch"] > 0:
+            # 非 stream：一次性返回全文
+            batch = {"choices": [{"tokens": [last_output_texts[i]]} for i in range(n_responses)]}
             batch["usage"] = {"input": n_input_tokens, "output": token_counters["total"]}
             yield batch
-
-
+        else:
+            # stream：如果还有没 flush 的小尾巴，吐出去
+            if token_counters["batch"] > 0:
+                batch["usage"] = {"input": n_input_tokens, "output": token_counters["total"]}
+                yield batch

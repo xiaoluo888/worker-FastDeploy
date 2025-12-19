@@ -7,8 +7,8 @@ import asyncio
 from typing import AsyncGenerator, Dict, Any
 
 from fastdeploy.engine.args_utils import EngineArgs
-# from fastdeploy.engine.engine import LLMEngine 
-from fastdeploy.engine.async_llm import AsyncLLM
+from fastdeploy.engine.engine import LLMEngine 
+# from fastdeploy.engine.async_llm import AsyncLLM
 from fastdeploy.entrypoints.openai.utils import make_arg_parser
 from fastdeploy.utils import FlexibleArgumentParser
 from utils import JobInput, create_error_response

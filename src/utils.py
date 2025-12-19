@@ -45,7 +45,7 @@ class JobInput:
 
         # 通用文本输入：适配多种字段名
         self.llm_input = job.get("prompt") or job.get("text") or job.get("input")
-        self.stream = job.get("stream", False)
+        self.stream = job.get("stream", True)
         self.max_tokens = job.get("max_tokens", 200)
 
         # 是否走 OpenAI 兼容路由（比如 /v1/chat/completions /v1/images/generations）
