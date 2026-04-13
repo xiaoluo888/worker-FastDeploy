@@ -9,6 +9,34 @@ from time import time
 logging.basicConfig(level=logging.INFO)
 
 
+def coerce_bool(value, default: bool) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"1", "true", "yes", "on"}:
+            return True
+        if normalized in {"0", "false", "no", "off"}:
+            return False
+    return default
+
+
+def normalize_openai_route(route):
+    if not route:
+        return None
+
+    normalized = str(route).strip()
+    if not normalized.startswith("/"):
+        normalized = f"/{normalized}"
+    if normalized.startswith("/openai"):
+        normalized = normalized[len("/openai"):]
+    return normalized
+
+
 def convert_limit_mm_per_prompt(input_string: str):
     result = {}
     if not input_string:
@@ -41,23 +69,36 @@ def count_physical_cores():
 
 class JobInput:
     def __init__(self, job: dict):
-        self.raw = job
+        self.raw = job or {}
+        self.openai_route = normalize_openai_route(self.raw.get("openai_route"))
+        self.openai_input = self.raw.get("openai_input") or {}
 
         # 通用文本输入：适配多种字段名
-        self.llm_input = job.get("prompt") or job.get("text") or job.get("input")
-        self.stream = job.get("stream", True)
-        self.max_tokens = job.get("max_tokens", 200)
+        self.llm_input = self.raw.get("prompt")
+        if self.llm_input is None:
+            self.llm_input = self.raw.get("text")
+        if self.llm_input is None and not self.openai_route:
+            self.llm_input = self.raw.get("input")
+        if self.llm_input is None and self.openai_route == "/v1/completions":
+            self.llm_input = self.openai_input.get("prompt")
+
+        self.stream = coerce_bool(self.raw.get("stream"), False)
+        self.max_tokens = self.raw.get("max_tokens")
+        if self.max_tokens is None:
+            self.max_tokens = self.raw.get("max_new_tokens")
+        if self.max_tokens is None:
+            self.max_tokens = self.openai_input.get("max_tokens")
+        if self.max_tokens is None:
+            self.max_tokens = 200
 
         # 是否走 OpenAI 兼容路由（比如 /v1/chat/completions /v1/images/generations）
-        self.openai_route = job.get("openai_route", False)
-        self.openai_input = job.get("openai_input")
-        samp_param = job.get("sampling_params", {})
+        samp_param = dict(self.raw.get("sampling_params", {}))
         if "max_tokens" not in samp_param:
-            samp_param["max_tokens"] = 100
+            samp_param["max_tokens"] = int(self.max_tokens)
+        if "n" not in samp_param and self.openai_input.get("n") is not None:
+            samp_param["n"] = int(self.openai_input["n"])
         self.sampling_params = SamplingParams(**samp_param)
         self.request_id = str(uuid.uuid4())
-        self.openai_route = job.get("openai_route")
-        self.openai_input = job.get("openai_input")
 
     def __repr__(self):
         return f"JobInput({self.__dict__})"

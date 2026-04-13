@@ -29,6 +29,16 @@
 # ========================= 使用自己预先构建的镜像 =========================
 FROM xiaoluo888/worker-fastdeploy:latest
 
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/src
+
+WORKDIR /src
+
+# Overlay the current repository source so RunPod builds use this checkout,
+# not whatever code happened to be baked into the base image.
+COPY src/*.py /src/
+COPY src/test_input.json /src/
+
 EXPOSE 8180
 
 ENTRYPOINT ["/usr/bin/tini", "--"]

@@ -71,12 +71,81 @@ class FastDeployEngine:
                 self._init_task = asyncio.create_task(self._init_async())
         await self._init_task
 
+    def _flatten_openai_content(self, content: Any) -> str:
+        if isinstance(content, list):
+            return "".join(
+                item.get("text", "") if isinstance(item, dict) else str(item)
+                for item in content
+            )
+        if content is None:
+            return ""
+        return str(content)
+
+    def _build_openai_prompt_dict(self, job_input: JobInput) -> Dict[str, Any]:
+        route = job_input.openai_route
+        body = job_input.openai_input or {}
+        prompt_dict: Dict[str, Any] = {}
+
+        if route == "/v1/chat/completions":
+            messages = body.get("messages") or []
+            if not messages:
+                raise ValueError("Missing messages for /v1/chat/completions.")
+
+            system_parts = []
+            dialog_parts = []
+
+            for message in messages:
+                role = message.get("role", "user")
+                content = self._flatten_openai_content(message.get("content"))
+
+                if role == "system":
+                    system_parts.append(content)
+                elif role == "assistant":
+                    dialog_parts.append(f"Assistant: {content}")
+                elif role == "user":
+                    dialog_parts.append(f"User: {content}")
+                else:
+                    dialog_parts.append(f"{role}: {content}")
+
+            prefix = ""
+            if system_parts:
+                prefix = "\n".join(system_parts) + "\n\n"
+
+            prompt_dict["prompt"] = prefix + "\n".join(dialog_parts) + "\nAssistant:"
+
+        elif route == "/v1/completions":
+            prompt = body.get("prompt")
+            if prompt is None:
+                raise ValueError("Missing prompt for /v1/completions.")
+            if isinstance(prompt, list):
+                prompt = "\n".join(str(item) for item in prompt)
+            prompt_dict["prompt"] = str(prompt)
+
+        else:
+            raise ValueError(f"Unsupported openai_route: {route}")
+
+        max_tokens = body.get("max_tokens")
+        if max_tokens is None:
+            max_tokens = body.get("max_new_tokens")
+        if max_tokens is None:
+            max_tokens = job_input.max_tokens
+        prompt_dict["max_tokens"] = int(max_tokens or 128)
+
+        temperature = body.get("temperature")
+        if temperature is not None:
+            prompt_dict["temperature"] = float(temperature)
+
+        return prompt_dict
+
     def _build_prompt_dict(self, job_input: JobInput) -> Dict[str, Any]:
         """
         非 OpenAI 路径：
         - 兼容 raw = {"input": {...}} 的 RunPod local_test 格式
         - 确保 max_tokens 一定是 int（默认 128）
         """
+        if job_input.openai_route:
+            return self._build_openai_prompt_dict(job_input)
+
         raw = getattr(job_input, "raw", None) or {}
         inp = raw.get("input", raw)  # ✅ 关键：兼容 {"input": {...}}
         llm_input = getattr(job_input, "llm_input", None)
@@ -247,12 +316,19 @@ class FastDeployEngine:
 
                 # ✅ 关键：在你现在的 processor(stream=True) 语义下，out.text 是 delta
                 delta = getattr(out, "text", "") or ""
+                token_ids = getattr(out, "token_ids", None)
+                if token_ids is not None:
+                    try:
+                        token_counters["total"] += len(token_ids)
+                    except TypeError:
+                        pass
+                elif delta:
+                    token_counters["total"] += 1
 
                 if stream:
                     if delta:
                         batch["choices"][idx]["tokens"].append(delta)
                         token_counters["batch"] += 1
-                        token_counters["total"] += 1
 
                     # 达到阈值就 flush 一次
                     if token_counters["batch"] >= self.batch_size.current_batch_size:

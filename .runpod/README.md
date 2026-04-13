@@ -12,6 +12,9 @@ Run LLMs using [Fastdeploy](https://github.com/PaddlePaddle/FastDeploy) with an 
 
 ## Endpoint Configuration
 
+Current published image is validated on SM80/SM90 GPUs such as `NVIDIA H100 80GB HBM3` and `NVIDIA A100 80GB PCIe`.
+If you want to run on SM86/SM89 GPUs such as L40 or RTX 4090, rebuild or reinstall the matching `fastdeploy-gpu` package inside the image first.
+
 All behaviour is controlled through environment variables:
 
 | Environment Variable                | Description                                       | Default                       | Options                                                            |
@@ -246,4 +249,3 @@ print(result["output"])
 ## Compatibility
 
 For supported models, see the [FastDeploy supported models documentation](https://github.com/PaddlePaddle/FastDeploy/blob/develop/docs/supported_models.md).
-

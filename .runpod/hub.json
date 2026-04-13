@@ -7,7 +7,7 @@
     "config": {
       "runsOn": "GPU",
       "containerDiskInGb": 100,
-      "gpuIds": "NVIDIA H100 80GB HBM3, NVIDIA A100 80GB PCIe, NVIDIA H100 80GB HBM3,NVIDIA RTX A2000,NVIDIA RTX A5000, NVIDIA RTX A6000, NVIDIA RTX A4000, NVIDIA GeForce RTX 4090, NVIDIA GeForce RTX 3090",
+      "gpuIds": "NVIDIA H100 80GB HBM3, NVIDIA A100 80GB PCIe",
       "gpuCount": 1,
 
       "allowedCudaVersions": [
@@ -536,4 +536,3 @@
       ]
     }
 }
-
