@@ -13,6 +13,7 @@ Run LLMs using [Fastdeploy](https://github.com/PaddlePaddle/FastDeploy) with an 
 ## Endpoint Configuration
 
 Current published image is validated on SM80/SM90 GPUs such as `NVIDIA H100 80GB HBM3` and `NVIDIA A100 80GB PCIe`.
+The current `Dockerfile` uses the official base image `ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/fastdeploy-cuda-12.9:2.5.0` and layers the RunPod worker runtime on top. You can override it at build time with `--build-arg FASTDEPLOY_BASE_IMAGE=...`.
 If you want to run on SM86/SM89 GPUs such as L40 or RTX 4090, rebuild or reinstall the matching `fastdeploy-gpu` package inside the image first.
 
 All behaviour is controlled through environment variables:

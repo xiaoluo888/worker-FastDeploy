@@ -2,7 +2,7 @@ import os
 import time
 import runpod
 from utils import JobInput
-from engine2 import FastDeployEngine
+from engine import FastDeployEngine
 from runpod import RunPodLogger
 
 log = RunPodLogger()

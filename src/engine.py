@@ -1,286 +1,345 @@
-# engine.py
 import os
 import json
-import logging
-import threading
+import uuid
 import asyncio
-from typing import AsyncGenerator, Dict, Any
+from dataclasses import is_dataclass, replace
+from typing import Any, AsyncGenerator, Dict, Optional
 
-from fastdeploy.engine.args_utils import EngineArgs
-from fastdeploy.engine.engine import LLMEngine 
-# from fastdeploy.engine.async_llm import AsyncLLM
-from fastdeploy.entrypoints.openai.utils import make_arg_parser
-from fastdeploy.utils import FlexibleArgumentParser
-from utils import JobInput, create_error_response
+from fastdeploy.engine.async_llm import AsyncLLM
 from engine_args import get_engine_args
 from runpod import RunPodLogger
+from utils import JobInput, create_error_response
+
 log = RunPodLogger()
 
-import time
-from fastdeploy.engine.engine import LLMEngine as _FDLLM
 
-def _llm_get_generated_tokens(self, req_id):
-    while True:
-        results = self._get_generated_result()
-        if not results:
-            time.sleep(0.001)
-            continue
+class BatchSize:
+    def __init__(self, max_batch_size: int = 64, min_batch_size: int = 1, growth_factor: float = 1.3):
+        self.max_batch_size = max_batch_size
+        self.min_batch_size = min_batch_size
+        self.growth_factor = growth_factor
+        self.current_batch_size = min_batch_size
 
-        for res in results:
-            if getattr(res, "request_id", None) != req_id:
-                continue
-            yield res
-            if getattr(res, "finished", False):
-                return
-
-if not hasattr(_FDLLM, "_get_generated_tokens"):
-    _FDLLM._get_generated_tokens = _llm_get_generated_tokens
-
-# def _build_argv_from_env():
-#     """
-#     用环境变量构造一小段“伪 argv”，喂给 FD 自己的 argparse。
-#     你可以按需扩展，这里先把最关键的几个写上。
-#     """
-#     argv = []
-
-#     # 模型路径 / 名称（必填）
-#     model = os.getenv("MODEL","/root/PaddlePaddle/ERNIE-4.5-0.3B-Paddle")
-#     if not model:
-#         raise RuntimeError("ENV MODEL / MODEL_NAME 未设置，FastDeploy 无法加载模型。")
-#     argv += ["--model", model]
-
-#     # 可选：最长长度
-#     max_model_len = os.getenv("MAX_MODEL_LEN")
-#     if max_model_len:
-#         argv += ["--max-model-len", str(max_model_len)]
-
-#     # 可选：tensor parallel
-#     tp = os.getenv("TENSOR_PARALLEL_SIZE")
-#     if tp:
-#         argv += ["--tensor-parallel-size", str(tp)]
-
-#     return argv
-
-
-def get_fd_engine_args() -> EngineArgs:
-    parser = make_arg_parser(FlexibleArgumentParser())
-    argv = _build_argv_from_env()
-    args = parser.parse_args(argv)
-    logging.info(f"[FD] Parsed args from env: {args.__dict__}")
-    return EngineArgs.from_cli_args(args)
+    def update(self) -> None:
+        nxt = int(self.current_batch_size * self.growth_factor)
+        if nxt < self.min_batch_size:
+            nxt = self.min_batch_size
+        if nxt > self.max_batch_size:
+            nxt = self.max_batch_size
+        self.current_batch_size = nxt
 
 
 class FastDeployEngine:
     def __init__(self):
-        log.info("Initializing FastDeploy LLM engine (RunPod adapter, Async)...")
+        log.info("Initializing FastDeployEngine (FD AsyncLLM)...")
         self.engine_args = get_engine_args()
         log.info(f"Engine args: {self.engine_args}")
 
-        self.llm_engine = LLMEngine.from_engine_args(self.engine_args)
+        self.pid = (
+            os.getenv("FD_ASYNC_LLM_PID")
+            or os.getenv("RUNPOD_POD_ID")
+            or f"fd-{uuid.uuid4().hex[:8]}"
+        )
 
-        ok = self.llm_engine.start()
-        if not ok:
-            raise RuntimeError("Failed to initialize FastDeploy LLM engine.")
-
-        self.max_concurrency = int(os.getenv("MAX_CONCURRENCY", "512"))
-
-    # ===== The prompt dictionary required to map JobInput to FD =====
-    def _jobinput_to_prompts(self, job_input: JobInput) -> Dict[str, Any]:
-        """
-        适配 utils.JobInput → FastDeploy LLMEngine 所需的 prompts dict。
-        当前 JobInput 结构：
-            - job_input.llm_input: 真正的 prompt（str 或 list）
-            - job_input.max_tokens: int
-            - job_input.raw: 原始 input dict
-            - job_input.openai_route / openai_input: OpenAI 兼容模式
-        """
-        prompts: Dict[str, Any] = {}
-
-        # ========== 1. 优先处理 OpenAI 兼容模式 ==========
-        if getattr(job_input, "openai_route", None) and getattr(job_input, "openai_input", None):
-            route = job_input.openai_route
-            body = job_input.openai_input or {}
-
-            # 公共采样参数
-            max_tokens = body.get("max_tokens") or body.get("max_new_tokens")
-            temperature = body.get("temperature", None)
-
-            if route == "/v1/chat/completions":
-                # ---- chat 模式：messages -> 一个大 prompt 字符串 ----
-                messages = body.get("messages", [])
-                system_parts = []
-                dialog_parts = []
-
-                for m in messages:
-                    role = m.get("role")
-                    content = m.get("content", "")
-
-                    # content 可能是 list（富文本 / 多模态），先压成纯 text
-                    if isinstance(content, list):
-                        content = "".join(
-                            p.get("text", "") if isinstance(p, dict) else str(p)
-                            for p in content
-                        )
-
-                    if role == "system":
-                        system_parts.append(content)
-                    elif role == "user":
-                        dialog_parts.append(f"User: {content}")
-                    elif role == "assistant":
-                        dialog_parts.append(f"Assistant: {content}")
-                    else:
-                        dialog_parts.append(f"{role}: {content}")
-
-                prefix = ""
-                if system_parts:
-                    prefix = "\n".join(system_parts) + "\n\n"
-
-                dialog_text = "\n".join(dialog_parts)
-
-                # 最简单的 prompt：system 提示 + 对话 + Assistant: 收尾
-                prompt = prefix + dialog_text + "\nAssistant:"
-                prompts["prompt"] = prompt
-
-            elif route == "/v1/completions":
-                # ---- text completions 模式 ----
-                prompt = body.get("prompt")
-                # OpenAI 里 prompt 可能是 str 或 list[str]
-                if isinstance(prompt, list):
-                    prompt = "\n".join(str(p) for p in prompt)
-                prompts["prompt"] = prompt
-
-            else:
-                # 其他 openai_route 先简单兜底：用 body.prompt
-                prompt = body.get("prompt")
-                if isinstance(prompt, list):
-                    prompt = "\n".join(str(p) for p in prompt)
-                prompts["prompt"] = prompt
-
-            # 补充采样参数
-            if max_tokens:
-                prompts["max_tokens"] = int(max_tokens)
-            if temperature is not None:
-                prompts["temperature"] = float(temperature)
-
-            return prompts
-
-        # ========== 2. 非 OpenAI 模式：走“原始 llm_input / raw” ==========
-        llm_input = getattr(job_input, "llm_input", None)
-
-        if llm_input is None:
-            # 兜底：从 raw 里尝试取 prompt
-            raw = getattr(job_input, "raw", {}) or {}
-            llm_input = raw.get("prompt")
-
-        if llm_input is None:
-            raise ValueError("JobInput 中未找到 llm_input 或 raw['prompt'] 字段。")
-
-        # 统一把 llm_input 转成字符串 prompt
-        if isinstance(llm_input, dict):
-            # 如果是 dict（比如单条 message），尝试取 content，否则直接序列化
-            if "content" in llm_input:
-                prompt = str(llm_input["content"])
-            else:
-                prompt = json.dumps(llm_input, ensure_ascii=False)
-        elif isinstance(llm_input, list):
-            # list[str] 或 list[dict]，简单拼接
-            if llm_input and isinstance(llm_input[0], dict) and "content" in llm_input[0]:
-                prompt = "\n".join(str(m.get("content", "")) for m in llm_input)
-            else:
-                prompt = "\n".join(str(x) for x in llm_input)
+        if hasattr(AsyncLLM, "from_engine_args"):
+            self.llm = AsyncLLM.from_engine_args(self.engine_args, pid=self.pid)
         else:
-            # str / 其它类型
+            self.llm = AsyncLLM(self.engine_args, pid=self.pid)  # type: ignore
+
+        self._init_task: Optional[asyncio.Task] = None
+        self._init_lock = asyncio.Lock()
+
+        self.batch_size = BatchSize(
+            max_batch_size=int(os.getenv("MAX_BATCH_SIZE", "64")),
+            min_batch_size=int(os.getenv("MIN_BATCH_SIZE", "1")),
+            growth_factor=float(os.getenv("BATCH_GROWTH_FACTOR", "1.3")),
+        )
+
+    async def _init_async(self) -> None:
+        if hasattr(self.llm, "start"):
+            await self.llm.start()
+        if hasattr(self.llm, "init_connections"):
+            await self.llm.init_connections()
+
+    async def _ensure_ready(self) -> None:
+        async with self._init_lock:
+            if self._init_task is None:
+                self._init_task = asyncio.create_task(self._init_async())
+        await self._init_task
+
+    def _flatten_openai_content(self, content: Any) -> str:
+        if isinstance(content, list):
+            return "".join(
+                item.get("text", "") if isinstance(item, dict) else str(item)
+                for item in content
+            )
+        if content is None:
+            return ""
+        return str(content)
+
+    def _resolve_num_choices(self, job_input: JobInput, source: Dict[str, Any]) -> int:
+        n = source.get("n")
+        if n is None:
+            sp = getattr(job_input, "sampling_params", None)
+            n = getattr(sp, "n", None) if sp is not None else None
+        try:
+            n_int = int(n) if n is not None else 1
+        except Exception:
+            n_int = 1
+        return max(1, n_int)
+
+    def _build_openai_prompt_dict(self, job_input: JobInput) -> Dict[str, Any]:
+        route = job_input.openai_route
+        body = job_input.openai_input or {}
+        prompt_dict: Dict[str, Any] = {}
+
+        if route == "/v1/chat/completions":
+            messages = body.get("messages") or []
+            if not messages:
+                raise ValueError("Missing messages for /v1/chat/completions.")
+
+            system_parts = []
+            dialog_parts = []
+
+            for message in messages:
+                role = message.get("role", "user")
+                content = self._flatten_openai_content(message.get("content"))
+
+                if role == "system":
+                    system_parts.append(content)
+                elif role == "assistant":
+                    dialog_parts.append(f"Assistant: {content}")
+                elif role == "user":
+                    dialog_parts.append(f"User: {content}")
+                else:
+                    dialog_parts.append(f"{role}: {content}")
+
+            prefix = ""
+            if system_parts:
+                prefix = "\n".join(system_parts) + "\n\n"
+
+            prompt_dict["prompt"] = prefix + "\n".join(dialog_parts) + "\nAssistant:"
+
+        elif route == "/v1/completions":
+            prompt = body.get("prompt")
+            if prompt is None:
+                raise ValueError("Missing prompt for /v1/completions.")
+            if isinstance(prompt, list):
+                prompt = "\n".join(str(item) for item in prompt)
+            prompt_dict["prompt"] = str(prompt)
+
+        else:
+            raise ValueError(f"Unsupported openai_route: {route}")
+
+        max_tokens = body.get("max_tokens")
+        if max_tokens is None:
+            max_tokens = body.get("max_new_tokens")
+        if max_tokens is None:
+            max_tokens = job_input.max_tokens
+        prompt_dict["max_tokens"] = int(max_tokens or 128)
+        prompt_dict["n"] = self._resolve_num_choices(job_input, body)
+
+        temperature = body.get("temperature")
+        if temperature is not None:
+            prompt_dict["temperature"] = float(temperature)
+
+        return prompt_dict
+
+    def _build_prompt_dict(self, job_input: JobInput) -> Dict[str, Any]:
+        if job_input.openai_route:
+            return self._build_openai_prompt_dict(job_input)
+
+        raw = getattr(job_input, "raw", None) or {}
+        inp = raw.get("input", raw)
+        llm_input = getattr(job_input, "llm_input", None)
+        if llm_input is None:
+            llm_input = inp.get("prompt", None)
+
+        if llm_input is None:
+            raise ValueError("Missing prompt: job_input.llm_input or raw['prompt'] or raw['input']['prompt'].")
+
+        if isinstance(llm_input, dict):
+            prompt = (
+                str(llm_input.get("content"))
+                if "content" in llm_input
+                else json.dumps(llm_input, ensure_ascii=False)
+            )
+        elif isinstance(llm_input, list):
+            prompt = "\n".join(str(x.get("content", "")) if isinstance(x, dict) else str(x) for x in llm_input)
+        else:
             prompt = str(llm_input)
 
-        prompts["prompt"] = prompt
+        out: Dict[str, Any] = {"prompt": prompt}
 
-        # 原始模式下的 max_tokens / temperature：
-        raw = getattr(job_input, "raw", {}) or {}
-        # 先用 job_input.max_tokens，再兜 raw
-        max_tokens = getattr(job_input, "max_tokens", None) \
-                    or raw.get("max_tokens") \
-                    or raw.get("max_new_tokens")
-        temperature = raw.get("temperature")
+        mt = getattr(job_input, "max_tokens", None)
+        if mt is None:
+            mt = inp.get("max_tokens", None)
+        if mt is None:
+            mt = inp.get("max_new_tokens", None)
+        if mt is None:
+            mt = 128
+        out["max_tokens"] = int(mt)
+        out["n"] = self._resolve_num_choices(job_input, inp)
 
-        if max_tokens:
-            prompts["max_tokens"] = int(max_tokens)
-        if temperature is not None:
-            prompts["temperature"] = float(temperature)
+        temp = inp.get("temperature", None)
+        if temp is not None:
+            out["temperature"] = float(temp)
 
-        return prompts
+        return out
+
+    def _patch_sampling_params(self, sp: Any, max_tokens: int) -> Any:
+        if sp is None:
+            return None
+
+        if is_dataclass(sp):
+            fields = getattr(sp, "__dataclass_fields__", {})
+            updates = {}
+
+            if "max_tokens" in fields and getattr(sp, "max_tokens", None) is None:
+                updates["max_tokens"] = int(max_tokens)
+
+            if "max_new_tokens" in fields and getattr(sp, "max_new_tokens", None) is None:
+                updates["max_new_tokens"] = int(max_tokens)
+
+            if "n" in fields:
+                n = getattr(sp, "n", None)
+                try:
+                    n_int = int(n) if n is not None else 1
+                except Exception:
+                    n_int = 1
+                if n_int <= 0:
+                    n_int = 1
+                if getattr(sp, "n", None) is None:
+                    updates["n"] = n_int
+
+            return replace(sp, **updates) if updates else sp
+
+        return None
+
+    async def _maybe_abort(self, request_id: str) -> None:
+        for name in ("abort", "abort_request", "abort_requests"):
+            fn = getattr(self.llm, name, None)
+            if fn is None:
+                continue
+            try:
+                ret = fn(request_id)
+                if asyncio.iscoroutine(ret):
+                    await ret
+            except Exception:
+                pass
+            break
 
     async def generate(self, job_input: JobInput) -> AsyncGenerator[Dict[str, Any], None]:
-        prompts = self._jobinput_to_prompts(job_input)
         log.debug("==============================================================================")
         log.debug(job_input.stream)
         log.debug("==============================================================================")
         try:
+            await self._ensure_ready()
+
+            prompt_dict = self._build_prompt_dict(job_input)
+            request_id = getattr(job_input, "request_id", None) or f"cmpl-{uuid.uuid4().hex[:12]}"
+            stream = getattr(job_input, "stream", False)
+            sp = getattr(job_input, "sampling_params", None)
+
+            n = getattr(sp, "n", None)
+            try:
+                n_int = int(n) if n is not None else 1
+            except Exception:
+                n_int = 1
+
+            sampling_params_to_pass = None
+            if n_int > 1:
+                sampling_params_to_pass = self._patch_sampling_params(sp, prompt_dict["max_tokens"])
+
             async for batch in self._generate_fd(
-                llm_input=prompts,
-                stream=job_input.stream,
-                request_id=job_input.request_id,
-                validated_sampling_params=job_input.sampling_params,
+                request_id=request_id,
+                prompt_dict=prompt_dict,
+                sampling_params=sampling_params_to_pass,
+                stream=stream,
             ):
                 yield batch
+
+        except asyncio.CancelledError:
+            rid = getattr(job_input, "request_id", None) or "unknown"
+            await self._maybe_abort(rid)
+            raise
         except Exception as e:
             yield create_error_response(str(e))
-
 
     async def _generate_fd(
         self,
         request_id: str,
-        llm_input,
-        validated_sampling_params,
-        stream
+        prompt_dict: Dict[str, Any],
+        sampling_params: Any,
+        stream: bool,
     ) -> AsyncGenerator[Dict[str, Any], None]:
-        results_generator = self.llm_engine.generate(llm_input, validated_sampling_params, request_id)
-        n_responses, n_input_tokens, is_first_output = validated_sampling_params.n, 0, True
-        last_output_texts, token_counters = ["" for _ in range(n_responses)], {"batch": 0, "total": 0}
-        
-        batch = {
-            "choices": [{"tokens": []} for _ in range(n_responses)],
-        }
-        async for request_output in results_generator:
-            if is_first_output:  # 只在第一步统计一次输入 token 数
-                n_input_tokens = len(request_output.prompt_token_ids)
-                is_first_output = False
+        results = self.llm.generate(prompt_dict, sampling_params, request_id)
 
-            # FastDeploy 这里是一个 CompletionOutput，而不是 list
-            completion = request_output.outputs
-            # 保险一点，兼容没有 text 的情况
-            output_index = getattr(completion, "index", 0)
-            full_text    = getattr(completion, "text", "") or ""   
+        n_responses = 1
+        if sampling_params is not None:
+            try:
+                n_responses = int(getattr(sampling_params, "n", 1) or 1)
+            except Exception:
+                n_responses = 1
+        if n_responses <= 0:
+            n_responses = 1
 
-            token_counters["total"] += 1
+        last_output_texts = ["" for _ in range(n_responses)]
+        token_counters = {"batch": 0, "total": 0}
+        n_input_tokens = 0
+        first = True
 
-            if stream:
-                # 和 vLLM 一样，只拿增量
-                new_output = full_text[len(last_output_texts[output_index]):]
-                batch["choices"][output_index]["tokens"].append(new_output)
-                token_counters["batch"] += 1
-        
-                if token_counters["batch"] >= batch_size.current_batch_size:
-                    batch["usage"] = {
-                        "input": n_input_tokens,
-                        "output": token_counters["total"],
-                    }
-                    yield batch
-        
-                    # 重置本 batch
-                    batch = {
-                        "choices": [{"tokens": []} for _ in range(n_responses)],
-                    }
-                    token_counters["batch"] = 0
-                    batch_size.update()
-        
-            # 更新 last_output_texts，方便下次算“增量”
-            last_output_texts[output_index] = full_text
-        
+        batch: Dict[str, Any] = {"choices": [{"tokens": []} for _ in range(n_responses)]}
+
+        async for request_output in results:
+            if first:
+                prompt_ids = getattr(request_output, "prompt_token_ids", None)
+                n_input_tokens = len(prompt_ids) if prompt_ids is not None else 0
+                first = False
+
+            outputs = getattr(request_output, "outputs", None)
+            if outputs is None:
+                out_list = []
+            elif isinstance(outputs, list):
+                out_list = outputs
+            else:
+                out_list = [outputs]
+
+            for out in out_list:
+                idx = int(getattr(out, "index", 0) or 0)
+                if idx >= n_responses:
+                    continue
+
+                delta = getattr(out, "text", "") or ""
+                token_ids = getattr(out, "token_ids", None)
+                if token_ids is not None:
+                    try:
+                        token_counters["total"] += len(token_ids)
+                    except TypeError:
+                        pass
+                elif delta:
+                    token_counters["total"] += 1
+
+                if stream:
+                    if delta:
+                        batch["choices"][idx]["tokens"].append(delta)
+                        token_counters["batch"] += 1
+
+                    if token_counters["batch"] >= self.batch_size.current_batch_size:
+                        batch["usage"] = {"input": n_input_tokens, "output": token_counters["total"]}
+                        yield batch
+
+                        batch = {"choices": [{"tokens": []} for _ in range(n_responses)]}
+                        token_counters["batch"] = 0
+                        self.batch_size.update()
+
+                if delta:
+                    last_output_texts[idx] += delta
+
         if not stream:
-            for output_index, output in enumerate(last_output_texts):
-                batch["choices"][output_index]["tokens"] = [output]
-            token_counters["batch"] += 1
-
-        if token_counters["batch"] > 0:
+            batch = {"choices": [{"tokens": [last_output_texts[i]]} for i in range(n_responses)]}
+            batch["usage"] = {"input": n_input_tokens, "output": token_counters["total"]}
+            yield batch
+        elif token_counters["batch"] > 0:
             batch["usage"] = {"input": n_input_tokens, "output": token_counters["total"]}
             yield batch

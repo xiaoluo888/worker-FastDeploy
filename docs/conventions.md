@@ -16,26 +16,25 @@
 ### 1. **Entry Point & Request Flow**
 
 ```
-RunPod Request → handler.py → JobInput → Engine Selection → FastDeploy Generation → Streaming Response
+RunPod Request → handler.py → JobInput → engine.py (AsyncLLM) → Streaming/Buffered Response
 ```
 
 **Key Components:**
 
 - `src/handler.py`: Main entry point using RunPod serverless framework
-- `src/utils.py`: Request parsing and utility classes (`JobInput`, `BatchSize`)
-- Two engine modes: OpenAI-compatible vs. standard FastDeploy API
+- `src/utils.py`: Request parsing and utility classes such as `JobInput`
+- `src/engine.py`: Canonical async FastDeploy engine wrapper built on `AsyncLLM`
 
 ### 2. **Engine Architecture**
 
 #### Core Classes:
 
-- **`FastDeployEngine`**: Base engine handling FastDeploy initialization and generation
-- **`OpenAIFastDeployEngine`**: Wrapper providing OpenAI API compatibility
-- **Engine Selection**: Automatic routing based on `job_input.openai_route`
+- **`FastDeployEngine`**: Async engine wrapper handling FastDeploy initialization, request normalization, generation, and batching
+- **OpenAI Compatibility**: Implemented inside `FastDeployEngine` by translating `job_input.openai_route` and `openai_input` into FastDeploy prompts
 
 #### Key Design Patterns:
 
-- **Dual API Support**: Same codebase serves both OpenAI-compatible and native FastDeploy-style APIs
+- **Dual Input Support**: Same engine handles both OpenAI-compatible requests and raw prompt-style requests
 - **Streaming by Default**: Token-level streaming with configurable batching
 - **Dynamic Batching**: Adaptive batch sizes that grow from min → max for efficiency
 
@@ -50,9 +49,10 @@ RunPod Request → handler.py → JobInput → Engine Selection → FastDeploy G
 #### Key Configuration Files:
 
 - `src/engine_args.py`: Centralized configuration management
-- `src/constants.py`: Default values for core settings
+- `src/engine.py`: Async engine lifecycle, request normalization, and streaming/batching behavior
+- `src/utils.py`: Request parsing and sampling parameter setup
 - `.runpod/hub.json`: Hub UI configuration (CRITICAL: always update when changing defaults)
-- `worker-config.json`: UI form generation for RunPod console (if exists)
+- `.runpod/tests.json`: RunPod smoke-test payloads and default test env
 
 ## Core Development Concepts
 
@@ -65,7 +65,9 @@ Notice: The pre-built image only supports SM80/SM90 GPUs (e.g. H800 / A800).
 If you are deploying on SM86/SM89 GPUs (e.g. L40 / 4090 / L20), you should reinstall fastdeploy-gpu inside the container after creation.
 
 
-- **Image**: `docker pull ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/fastdeploy-cuda-12.6:2.3.0` 
+- **Image**: `docker pull ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/fastdeploy-cuda-12.9:2.5.0`
+- **Worker Layer**: This repository's `Dockerfile` adds the RunPod runtime and current `/src` worker code on top of the official FastDeploy base image
+- **Override Path**: You can override the default base image at build time with `--build-arg FASTDEPLOY_BASE_IMAGE=...`
 - **Configuration**: Entirely via environment variables
 - **Model Loading**: Downloads or mounts model at runtime (e.g., from local volume or remote storage)
 - **Use Case**: Quick deployment, model experimentation
@@ -93,9 +95,9 @@ class JobInput:
 
 #### Tokenizer Handling:
 
-- **Wrapper Pattern**: `TokenizerWrapper` for consistent chat template application
+- **Engine-Managed Tokenization**: Tokenization and chat-template handling are delegated to FastDeploy and the model-specific processors
 - **Special Cases**: Certain models may use their own native tokenizer or special chat formatting
-- **Chat Templates**: Automatic application for message-based inputs
+- **Chat Templates**: OpenAI-style message input is normalized in `engine.py` before reaching FastDeploy
 
 #### Model Loading:
 
@@ -111,18 +113,17 @@ class JobInput:
 
 ```
 src/
-├── handler.py          # RunPod entry point
-├── engine.py          # Core vLLM engines
-├── engine_args.py     # Configuration management
-├── utils.py           # Request parsing & utilities
-├── tokenizer.py       # Tokenizer wrapper
-├── constants.py       # Default constants
-└── download_model.py  # Model downloading logic
+├── handler.py         # RunPod entry point
+├── engine.py          # Canonical async FastDeploy engine wrapper
+├── engine_args.py     # Environment → FastDeploy argument mapping
+├── utils.py           # Request parsing and shared helpers
+├── test_input.json    # Local smoke-test payload
+└── __init__.py
 ```
 
 #### Separation of Concerns:
 
-- **Engine Logic**: Isolated in `engine.py` classes
+- **Engine Logic**: Isolated in `engine.py`
 - **Configuration**: Centralized in `engine_args.py`
 - **Request Handling**: Abstracted via `JobInput` class
 - **Platform Integration**: Contained in `handler.py`
@@ -145,7 +146,7 @@ src/
 
 - **FastDeploy Settings**: Match engine parameter names (uppercase)
 - **RunPod Settings**: `MAX_CONCURRENCY`, `DEFAULT_BATCH_SIZE`
-- **OpenAI Settings**: `OPENAI_` prefix for compatibility settings
+- **Model Serving Settings**: `MODEL`, `SERVED_MODEL_NAME`, `MAX_MODEL_LEN`, etc.
 - **Feature Flags**: `ENABLE_*`, `DISABLE_*` pattern
 
 #### Type Conventions:
@@ -158,16 +159,12 @@ src/
 
 #### Multi-Stage Builds:
 
-- **Base**: CUDA runtime environment
-- **Dependencies**: Python packages, PaddlePaddle and FastDeploy
-- **Model Download**: Model baking stage
-- **Runtime**: Final application layer
+- **Base**: Official FastDeploy runtime image (`fastdeploy-cuda-12.9:2.5.0`)
+- **Dependencies**: Add only worker-specific runtime packages such as `runpod`
+- **Runtime**: Overlay the current repository's `/src` files and start `handler.py`
 
 #### Build Arguments:
 
 - **MODEL**: Primary model identifier or path
 - **QUANTIZATION**: Optimization settings
 - **WORKER_CUDA_VERSION**: CUDA compatibility
-
-
-

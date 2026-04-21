@@ -1,38 +1,23 @@
-# # ========================= 使用基础镜像构建新的FD环境 =========================
-# FROM nvidia/cuda:12.6.0-base-ubuntu22.04 
+# ========================= 使用官方 FastDeploy 镜像 =========================
+ARG FASTDEPLOY_BASE_IMAGE=ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/fastdeploy-cuda-12.9:2.5.0
+FROM ${FASTDEPLOY_BASE_IMAGE}
 
-# RUN apt-get update -y \
-#     && apt-get install -y python3-pip
-
-# RUN ldconfig /usr/local/cuda-12.6/compat/
-
-# # Install Python dependencies
-# RUN --mount=type=cache,target=/root/.cache/pip \
-#     python3 -m pip install --upgrade pip && \
-#     python3 -m pip install --pre paddlepaddle-gpu -i https://www.paddlepaddle.org.cn/packages/nightly/cu126/ && \
-#     python3 -m pip install fastdeploy-gpu -i https://www.paddlepaddle.org.cn/packages/nightly/fastdeploy-gpu-80_90/ --extra-index-url https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
-
-# # 避免交互 & 打印不缓冲
-# ENV DEBIAN_FRONTEND=noninteractive \
-#     PYTHONUNBUFFERED=1 \
-#     PIP_DISABLE_PIP_VERSION_CHECK=1
-
-# # 可选：加一些系统工具（调试日志/证书等）
-# RUN apt-get update && apt-get install -y --no-install-recommends \
-#     ca-certificates curl tini && \
-#     rm -rf /var/lib/apt/lists/*
-
-# # install runpod（Serverless SDK）
-# RUN pip install --no-cache-dir runpod
-
-
-# ========================= 使用自己预先构建的镜像 =========================
-FROM xiaoluo888/worker-fastdeploy:latest
-
-ENV PYTHONUNBUFFERED=1 \
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PYTHONPATH=/src
 
 WORKDIR /src
+
+# Official image already provides PaddlePaddle + FastDeploy.
+# The worker only needs the RunPod runtime and tini on top.
+RUN apt-get update && apt-get install -y --no-install-recommends tini && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN python3 -m pip install --no-cache-dir "runpod>=1.8,<2.0"
+
+# If you later need broader GPU compatibility than the official image offers,
+# rebuild from a plain CUDA base and reinstall matching Paddle/FastDeploy wheels.
 
 # Overlay the current repository source so RunPod builds use this checkout,
 # not whatever code happened to be baked into the base image.
