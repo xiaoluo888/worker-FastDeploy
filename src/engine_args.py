@@ -45,6 +45,14 @@ def _build_argv_from_env():
     _append_if_set(argv, "--data-parallel-size", "DATA_PARALLEL_SIZE")
     _append_if_set(argv, "--block-size", "BLOCK_SIZE")
     _append_if_set(argv, "--max-num-seqs", "MAX_NUM_SEQS")
+    max_num_batched_tokens = os.getenv("MAX_NUM_BATCHED_TOKENS")
+    if max_num_batched_tokens in (None, ""):
+        # Keep profile-time prefill sizing aligned with the configured context limit.
+        # FastDeploy's V1 scheduler otherwise defaults to 8192 on GPU, which can
+        # over-profile small RunPod smoke-test configs and fail startup.
+        max_num_batched_tokens = os.getenv("MAX_MODEL_LEN")
+    if max_num_batched_tokens not in (None, ""):
+        argv += ["--max-num-batched-tokens", str(max_num_batched_tokens)]
     _append_if_set(argv, "--tokenizer", "TOKENIZER")
 
     _append_if_set(argv, "--gpu-memory-utilization", "GPU_MEMORY_UTILIZATION")
