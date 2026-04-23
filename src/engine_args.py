@@ -1,10 +1,24 @@
 # engine_args.py
 import os
 import logging
+import json
+from pathlib import Path
 
 from fastdeploy.engine.args_utils import EngineArgs
 from fastdeploy.entrypoints.openai.utils import make_arg_parser
 from fastdeploy.utils import FlexibleArgumentParser
+
+
+DEFAULT_MODEL_ID = "baidu/ERNIE-4.5-0.3B-Paddle"
+DEFAULT_LOCAL_MODEL_ROOT = "/root/PaddlePaddle"
+LOCAL_MODEL_ARGS_PATH = "/local_model_args.json"
+
+ENV_ALIASES = {
+    "MODEL_NAME": "MODEL",
+    "MODEL_REPO": "MODEL",
+    "MODEL_REVISION": "REVISION",
+    "TOKENIZER_NAME": "TOKENIZER",
+}
 
 
 def _env_bool(key: str):
@@ -20,7 +34,7 @@ def _env_bool(key: str):
 
 
 def _append_if_set(argv, flag: str, env_key: str):
-    v = os.getenv(env_key)
+    v = _get_env(env_key)
     if v not in (None, ""):
         argv += [flag, str(v)]
 
@@ -31,13 +45,86 @@ def _append_bool_flag(argv, flag: str, env_key: str):
         argv.append(flag)
 
 
+def _get_env(key: str, default=None):
+    keys = [key]
+    keys.extend(alias for alias, target in ENV_ALIASES.items() if target == key)
+    for env_key in keys:
+        value = os.getenv(env_key)
+        if value not in (None, ""):
+            return value
+    return default
+
+
+def _load_local_model_args():
+    if not os.path.exists(LOCAL_MODEL_ARGS_PATH):
+        return {}
+
+    with open(LOCAL_MODEL_ARGS_PATH, "r", encoding="utf-8") as f:
+        local_args = json.load(f)
+
+    logging.info("Using baked in model args from %s: %s", LOCAL_MODEL_ARGS_PATH, local_args)
+    os.environ["TRANSFORMERS_OFFLINE"] = "1"
+    os.environ["HF_HUB_OFFLINE"] = "1"
+
+    for key, value in local_args.items():
+        target_key = ENV_ALIASES.get(key, key)
+        if value not in (None, "", "None") and os.getenv(target_key) in (None, ""):
+            os.environ[target_key] = str(value)
+
+    return local_args
+
+
+def _is_remote_model_id(model: str) -> bool:
+    model = model.strip()
+    if not model or "://" in model:
+        return False
+    if model.startswith(("/", "./", "../", "~")):
+        return False
+    return "/" in model and not Path(model).expanduser().exists()
+
+
+def _resolve_model(model: str) -> str:
+    expanded = Path(model).expanduser()
+    if expanded.exists():
+        return str(expanded)
+
+    if not _is_remote_model_id(model):
+        return model
+
+    local_root = Path(os.getenv("LOCAL_MODEL_ROOT", DEFAULT_LOCAL_MODEL_ROOT)).expanduser()
+    local_candidate = local_root / model.rstrip("/").split("/")[-1]
+    if local_candidate.exists():
+        logging.info("[FD] Resolved MODEL %s to local model path: %s", model, local_candidate)
+        return str(local_candidate)
+
+    try:
+        from huggingface_hub import snapshot_download
+    except Exception as exc:
+        raise RuntimeError(
+            f"MODEL={model!r} looks like a Hugging Face model id, but huggingface_hub "
+            "is unavailable and no local model directory was found."
+        ) from exc
+
+    offline = bool(_env_bool("HF_HUB_OFFLINE")) or bool(_env_bool("TRANSFORMERS_OFFLINE"))
+    revision = _get_env("REVISION") or None
+    cache_dir = os.getenv("HF_HOME") or os.getenv("HUGGINGFACE_HUB_CACHE") or None
+    logging.info("[FD] Downloading MODEL %s from Hugging Face Hub", model)
+    return snapshot_download(
+        repo_id=model,
+        revision=revision,
+        cache_dir=cache_dir,
+        local_files_only=offline,
+    )
+
+
 def _build_argv_from_env():
+    _load_local_model_args()
     argv = []
 
-    # model = os.getenv("MODEL","/root/PaddlePaddle/ERNIE-4.5-0.3B-Paddle")
-    model = os.getenv("MODEL","baidu/ERNIE-4.5-0.3B-Paddle")
+    model = _get_env("MODEL", DEFAULT_MODEL_ID)
     if not model:
         raise RuntimeError("MODEL not set")
+    model = _resolve_model(model)
     argv += ["--model", model]
 
     _append_if_set(argv, "--max-model-len", "MAX_MODEL_LEN")
@@ -53,7 +140,9 @@ def _build_argv_from_env():
         max_num_batched_tokens = os.getenv("MAX_MODEL_LEN")
     if max_num_batched_tokens not in (None, ""):
         argv += ["--max-num-batched-tokens", str(max_num_batched_tokens)]
-    _append_if_set(argv, "--tokenizer", "TOKENIZER")
+    tokenizer = _get_env("TOKENIZER")
+    if tokenizer not in (None, ""):
+        argv += ["--tokenizer", _resolve_model(str(tokenizer))]
 
     _append_if_set(argv, "--gpu-memory-utilization", "GPU_MEMORY_UTILIZATION")
     _append_if_set(argv, "--kv-cache-ratio", "KV_CACHE_RATIO")
